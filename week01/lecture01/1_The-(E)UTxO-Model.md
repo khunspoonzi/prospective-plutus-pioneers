@@ -73,20 +73,34 @@ Alice (90 ADA) + Bob (50 ADA) + Bob (10 ADA) --> Tx2 -> Alice (35 ADA) + Bob (5 
 
 But how do we prevent a transaction from spending arbitrary UTxOs, e.g. Bob spending Alice's money?
 
-## Transaction Signatures
+## [Transaction Signatures](https://youtu.be/_zr3W8cgzIQ?t=771)
 
-Transaction signatures dictate the conditions under which a transaction can spend a given UTxO. In other words, a transaction requires a digital signature from the owners of its given inputs.
+Alice, Bob, and Charlie all have ADA addresses, each of which corresponds to a public key, which in turn can be verified by a digital signature.
 
-As such, Tx1 required only Alice's signature whereas Tx2 required both Alice and Bob's signatures.
+Under the traditional UTxO model, these signatures dictate the conditions under which a transaction can spend a given UTxO. In other words, a transaction would require a signature from the owners of its given inputs.
 
-Note that all features discussed up until this point are native to the UTxO model.
+As such, in the above example, Tx1 required only Alice's signature whereas Tx2 required both Alice and Bob's signatures.
 
-## Extending the UTxO Model
+Under the extended (E)UTxO model however, the validation process that allows a transaction to spend a UTxO becomes more general.
+
+## [Extending the UTxO Model](https://youtu.be/_zr3W8cgzIQ?t=844)
 
 Enter smart contracts.
+
+Under the (E)UTxO model, the need for validation through transaction signatures is replaced by a Plutus script containing arbitrary logic that lives in a more general address, which does not correspond to a public key.
+
+This arbitrary logic can, in turn, dictate the conditions under which a transaction can spend a given UTxO. In lieu of a transaction signature, the transaction input itself is used to justify whether the transaction is allowed to consume it, along with a piece of arbitrary data called a "redeemer".
+
+## [Redeemers](https://youtu.be/_zr3W8cgzIQ?t=950)
+
+More notes soon...
 
 ## Summary
 
 The effect of a transaction is to consume unspent transaction outputs (UTxO) and to produce new ones. This is the only thing that happens on a UTxO blockchain. In other words, no data belonging to an existing UTxO ever changes; the UTxO itself is simply unspent until it is spent.
+
+In order for a transaction to spend a given UTxO under the traditional UTxO model, it must be signed by the UTxO's owner.
+
+Under the (E)UTxO model, a script containing arbitrary logic replaces public keys while a redeemer replaces the transaction signature.
 
 ## More Notes Soon...
