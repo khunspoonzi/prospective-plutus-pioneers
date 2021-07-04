@@ -1,4 +1,4 @@
-# Plutus Poor Souls
+# Prospective Plutus Pioneers
 An unofficial repository for resources related to the second iteration of the Plutus Pioneer Program.
 
 Follow the course: https://github.com/input-output-hk/plutus-pioneer-program

@@ -71,6 +71,20 @@ The resulting transaction (Tx2) takes three UTxO inputs and produces three UTxO 
 Alice (90 ADA) + Bob (50 ADA) + Bob (10 ADA) --> Tx2 -> Alice (35 ADA) + Bob (5 ADA) + Charlie (110 ADA)
 ```
 
+But how do we prevent a transaction from spending arbitrary UTxOs, e.g. Bob spending Alice's money?
+
+## Transaction Signatures
+
+Transaction signatures dictate the conditions under which a transaction can spend a given UTxO. In other words, a transaction requires a digital signature from the owners of its given inputs.
+
+As such, Tx1 required only Alice's signature whereas Tx2 required both Alice and Bob's signatures.
+
+Note that all features discussed up until this point are native to the UTxO model.
+
+## Extending the UTxO Model
+
+Enter smart contracts.
+
 ## Summary
 
 The effect of a transaction is to consume unspent transaction outputs (UTxO) and to produce new ones. This is the only thing that happens on a UTxO blockchain. In other words, no data belonging to an existing UTxO ever changes; the UTxO itself is simply unspent until it is spent.
