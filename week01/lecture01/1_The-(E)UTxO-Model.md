@@ -85,7 +85,7 @@ Under the extended (E)UTxO model however, the validation process that allows a t
 
 ## [Smart Contracts: Scripts and Redeemers](https://youtu.be/_zr3W8cgzIQ?t=844)
 
-Under the (E)UTxO model, the need for validation through transaction signatures is replaced by a Plutus script containing arbitrary logic that lives in a more general address, which does not correspond to a public key.
+Under the (E)UTxO model, the need for validation through transaction signatures is replaced by a script containing arbitrary logic that lives in a more general address, which does not correspond to a public key.
 
 This arbitrary logic can, in turn, dictate the conditions under which a transaction can spend a given UTxO.
 
@@ -93,9 +93,9 @@ In lieu of a transaction signature, the transaction input itself is used to just
 
 ### Example: [Bitcoin](https://youtu.be/_zr3W8cgzIQ?t=1004)
 
-Bitcoin offers a primitive implementation of smart contracts with scripts and redeemers known as [Script](https://en.bitcoin.it/wiki/Script).
+Bitcoin offers a primitive implementation of smart contracts with scripts and redeemers using a programming language known as [Script](https://en.bitcoin.it/wiki/Script).
 
-In the case of Script, a script on the UTxO side receives a redeemer from the input side, which is used to decide whether it is permitted to consume the UTxO.
+In the case of Bitcoin, a script on the UTxO side receives a redeemer from the input side, which is used to decide whether it is permitted to consume the UTxO.
 
 More information can be given to the script if necessary, but generally speaking, Bitcoin smart contracts operate with very little context aside from the redeemer.
 
@@ -103,7 +103,29 @@ More information can be given to the script if necessary, but generally speaking
 
 Ethereum implements smart contracts toward the opposite extreme with respect to context using [Solidity](https://en.wikipedia.org/wiki/Solidity).
 
-More Notes Soon...
+In the case of Ethereum smart contracts, Solidity scripts are able to see the complete state of the blockchain thus making them much more powerful than Bitcoin smart contracts.
+
+Importantly however, the vast number of possibilities afforded by such power can make it difficult to predict what a given script will do, thus opening the door to all sorts of security issues.
+
+### Example: [Cardano](https://youtu.be/_zr3W8cgzIQ?t=1100)
+
+Cardano's implementation of smart contracts using [Plutus](https://developers.cardano.org/en/programming-languages/plutus/overview/) lies somewhere in between those of Bitcoin and Ethereum.
+
+In the case of Cardano, a script cannot see the complete state of the blockchain like in the case of Ethereum, but can see more than the redeemer of a single input like in the case of Bitcoin.
+
+Specifically, a Plutus script in a Cardano smart contract can see the whole transaction that is being validated. In other words, it can see all other inputs and outputs of the transaction, as well as the transaction itself in deciding whether it is permitted to consume a given output.
+
+One additional component is required in order to make Cardano smart contracts as powerful and expressive as Ethereum smart contracts: the so-called "datum," which is a piece of data that can be associated with a UTxO in addition to its value.
+
+### Comparison: [Cardano vs. Ethereum](https://youtu.be/_zr3W8cgzIQ?t=1190)
+
+The datum component of Cardano smart contracts ensures that any given piece of logic that can be expressed in an Ethereum smart contract can also be expressed within the (E)UTxO model that Cardano uses.
+
+Aside from being at least as powerful as Ethereum smart contracts, Cardano smart contracts offer a number of added benefits:
+
+- Using Plutus, it is possible to check whether a transaction will validate in your wallet before ever sending it to the blockchain.
+
+- It is easier to analyze and improve a Plutus script from a security standpoint because it isn't necessary to consider the complete state of the blockchain.
 
 ## Summary
 
@@ -111,6 +133,6 @@ The effect of a transaction is to consume unspent transaction outputs (UTxO) and
 
 In order for a transaction to spend a given UTxO under the traditional UTxO model, it must be signed by the UTxO's owner.
 
-Under the (E)UTxO model, a script containing arbitrary logic replaces public keys while a redeemer replaces the transaction signature.
+Under the (E)UTxO model, a script containing arbitrary logic replaces public keys while a redeemer replaces the transaction signature. This is what we mean when we refer to smart contracts.
 
 ## More Notes Soon...
