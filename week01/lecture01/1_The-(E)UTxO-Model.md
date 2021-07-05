@@ -83,17 +83,27 @@ As such, in the above example, Tx1 required only Alice's signature whereas Tx2 r
 
 Under the extended (E)UTxO model however, the validation process that allows a transaction to spend a UTxO becomes more general.
 
-## [Extending the UTxO Model](https://youtu.be/_zr3W8cgzIQ?t=844)
-
-Enter smart contracts.
+## [Smart Contracts: Scripts and Redeemers](https://youtu.be/_zr3W8cgzIQ?t=844)
 
 Under the (E)UTxO model, the need for validation through transaction signatures is replaced by a Plutus script containing arbitrary logic that lives in a more general address, which does not correspond to a public key.
 
-This arbitrary logic can, in turn, dictate the conditions under which a transaction can spend a given UTxO. In lieu of a transaction signature, the transaction input itself is used to justify whether the transaction is allowed to consume it, along with a piece of arbitrary data called a "redeemer".
+This arbitrary logic can, in turn, dictate the conditions under which a transaction can spend a given UTxO.
 
-## [Redeemers](https://youtu.be/_zr3W8cgzIQ?t=950)
+In lieu of a transaction signature, the transaction input itself is used to justify whether the transaction is allowed to consume it, along with a piece of arbitrary data called a "redeemer".
 
-More notes soon...
+### Example: [Bitcoin](https://youtu.be/_zr3W8cgzIQ?t=1004)
+
+Bitcoin offers a primitive implementation of smart contracts with scripts and redeemers known as [Script](https://en.bitcoin.it/wiki/Script).
+
+In the case of Script, a script on the UTxO side receives a redeemer from the input side, which is used to decide whether it is permitted to consume the UTxO.
+
+More information can be given to the script if necessary, but generally speaking, Bitcoin smart contracts operate with very little context aside from the redeemer.
+
+### Example: [Ethereum](https://youtu.be/_zr3W8cgzIQ?t=1040)
+
+Ethereum implements smart contracts toward the opposite extreme with respect to context using [Solidity](https://en.wikipedia.org/wiki/Solidity).
+
+More Notes Soon...
 
 ## Summary
 
