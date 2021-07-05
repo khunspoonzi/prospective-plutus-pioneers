@@ -47,7 +47,7 @@ In this example, the sum of the outputs is equal to the sum of the inputs. In pr
 - Accounting for fees, where the sum of the inputs will be slightly greater than the sum of the outputs.
 - Minting of native tokens, where the sum of the outputs will be greater than the sum of the inputs.
 
-- Buring of native tokens, where the sum of the inputs will be greater than the sum of the outputs.
+- Burning of native tokens, where the sum of the inputs will be greater than the sum of the outputs.
 
 ## Example: [Alice and Bob Contd.](https://youtu.be/_zr3W8cgzIQ?t=710)
 
