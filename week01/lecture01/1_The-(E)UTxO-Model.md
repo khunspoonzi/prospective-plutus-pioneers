@@ -117,6 +117,8 @@ Specifically, a Plutus script in a Cardano smart contract can see the whole tran
 
 One additional component is required in order to make Cardano smart contracts as powerful and expressive as Ethereum smart contracts: the so-called "datum," which is a piece of data that can be associated with a UTxO in addition to its value.
 
+With respect to Plutus, the spending transaction is responsible for providing the script, redeemer, and datum. Conversely, the producing transaction is only required to provide the hashes of the script and datum, although it can include the full script and datum optionally.
+
 ### Comparison: [Cardano vs. Ethereum](https://youtu.be/_zr3W8cgzIQ?t=1190)
 
 The datum component of Cardano smart contracts ensures that any given piece of logic that can be expressed in an Ethereum smart contract can also be expressed within the (E)UTxO model that Cardano uses.
