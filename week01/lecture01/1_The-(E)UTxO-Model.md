@@ -123,16 +123,20 @@ The datum component of Cardano smart contracts ensures that any given piece of l
 
 Aside from being at least as powerful as Ethereum smart contracts, Cardano smart contracts offer a number of added benefits:
 
-- Using Plutus, it is possible to check whether a transaction will validate in your wallet before ever sending it to the blockchain.
+- Using Plutus, it is possible to check whether a transaction will validate in your wallet before ever sending it to the blockchain. In other words, given all expected inputs, a transaction that validates in your wallet will also validate on the Cardano blockchain.
 
-- It is easier to analyze and improve a Plutus script from a security standpoint because it isn't necessary to consider the complete state of the blockchain.
+- While it isn't possible to prevent certain failures such as a race condition between two transactions attempting to consume the same output, such failures are guranteed not to incur a fee on the Cardano blockchain. In contrast, a failed transaction on the Ethereum blockchain may still incur a gas fee.
+
+- It is easier to analyze and improve a Plutus script from a security standpoint because it isn't necessary to consider the complete state of the blockchain but rather the much more limited scope of the spending transaction. This makes it much easier to understand what is happening as well as what could go wrong.
 
 ## Summary
 
-The effect of a transaction is to consume unspent transaction outputs (UTxO) and to produce new ones. This is the only thing that happens on a UTxO blockchain. In other words, no data belonging to an existing UTxO ever changes; the UTxO itself is simply unspent until it is spent.
+The Bitcoin and Cardano blockchains both utilize UTxO accounting models.
+
+The effect of a transaction under a UTxO model is to consume unspent transaction outputs (UTxOs) and produce new ones. This is the only thing that happens on a UTxO blockchain. In other words, no data belonging to an existing UTxO ever changes; the UTxO itself is simply unspent until it is spent.
 
 In order for a transaction to spend a given UTxO under the traditional UTxO model, it must be signed by the UTxO's owner.
 
 Under the (E)UTxO model, a script containing arbitrary logic replaces public keys while a redeemer replaces the transaction signature. This is what we mean when we refer to smart contracts.
 
-## More Notes Soon...
+In the case of Cardano, an additional component known as a "datum" is utilized to afford its smart contracts the same level of power as Ethereum smart contracts, but without the inherent risks associated with needing to consider the complete state of the blockchain within a given script.
