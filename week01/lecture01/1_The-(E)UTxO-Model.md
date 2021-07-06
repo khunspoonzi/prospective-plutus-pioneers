@@ -1,6 +1,6 @@
 # [The (E)UTxO Model](https://www.youtube.com/watch?v=_zr3W8cgzIQ&t=402s)
 
-The (E)UTxO models is the accounting model that Cardano uses, and it stands for:
+The (E)UTxO model is the accounting model that Cardano uses, and it stands for:
 
 | Letter | Word        |
 | ------ | ----------- |

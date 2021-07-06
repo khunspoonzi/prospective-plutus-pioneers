@@ -31,7 +31,7 @@ This transaction produces one output:
 
 ```Auction (NFT) + Bob (100 ADA) --> Tx1 --> Auction (NFT + 100 ADA) | (Bob, 100)```
 
-In this case, the transaction redeemer that is used to unlock to original auction UTxO is an algebraic data type called "bid," which is checked by the script to ensure that the minimum bid requirement is met, that the bid took place before the deadline, and that the correct input and outputs are present.
+In this case, the transaction redeemer that is used to unlock the original auction UTxO is an algebraic data type called "bid," which is checked by the script to ensure that the minimum bid requirement is met, that the bid took place before the deadline, and that the correct input and outputs are present.
 
 ## Example: [Alice Auctions An NFT Contd.](https://youtu.be/_zr3W8cgzIQ?t=1983)
 
