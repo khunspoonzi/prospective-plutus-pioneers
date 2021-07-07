@@ -93,3 +93,5 @@ trusted-public-keys = hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=
     `nix-shell`
 
 5. Wait for Nix shell to initialize
+
+    **Note:** This can take 30 - 40 minutes and will consume more than 10 GB in your nix/store/ directory
