@@ -2,6 +2,21 @@
 
 The following steps were carried out on a Linux-based operating system.
 
+## Clone the Plutus Pioneer Program Repo
+
+1. Open a new terminal window
+2. Navigate to the directory that will house the Plutus Pioneer Program repo:
+
+    `cd /path/where/i/want/plutus-pioneer-program/`
+
+3. Clone the Plutus Pioneer Program repo from GitHub:
+
+    `git clone git@github.com:input-output-hk/plutus-pioneer-program.git`
+
+4. Navigate into Plutus Pioneer Program repo:
+
+    `cd plutus-pioneer-program/`
+
 ## Clone the Plutus Repo
 
 1. Open a new terminal window
@@ -95,3 +110,18 @@ trusted-public-keys = hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=
 5. Wait for Nix shell to initialize
 
     **Note:** This can take 30 - 40 minutes and will consume more than 10 GB in your nix/store/ directory
+
+## Build the English Auction Contract
+
+1. Enter a Nix shell from the Plutus repository as outlined previously
+2. Navigate to week 1 of the Pluts Pioneer Program repo
+
+    `cd /path/to/plutus-pioneer-program/code/week01/`
+
+2. Update Cabal
+
+    `cabal update`
+
+3. Build with Cabal
+
+    `cabal build`
