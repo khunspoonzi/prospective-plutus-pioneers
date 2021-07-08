@@ -114,7 +114,7 @@ trusted-public-keys = hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=
 ## Build the English Auction Contract
 
 1. Enter a Nix shell from the Plutus repository as outlined previously
-2. Navigate to week 1 of the Pluts Pioneer Program repo
+2. Navigate to week 1 of the Plutus Pioneer Program repo
 
     `cd /path/to/plutus-pioneer-program/code/week01/`
 

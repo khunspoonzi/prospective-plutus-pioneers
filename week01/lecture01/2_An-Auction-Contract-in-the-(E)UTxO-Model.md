@@ -79,3 +79,11 @@ In an alternate reality, Alice receives no bids for her NFT.
 In this case, Alice will need to create a transaction (Tx1) that uses a "close" redeemer in which her NFT is returned to herself (or anybody else if she so pleases).
 
 ```Auction (NFT) --> Tx1 --> Alice (NFT)```
+
+## Burning Questions
+
+### [What if a transaction to close the auction is never created?](https://youtu.be/sN3BIa3GAOc?t=7)
+
+When considering a circumstance in which nobody can or is willing to create a closing transaction, it is important to note that UTxOs on the blockchain are passive data. As such, a closing transaction **must** be created in order to complete the auction.
+
+Since external triggers are required in order to change the state of a blockchain, a UTxO living on that blockchain would not be able to invoke a transaction by itself. However, it would be possible to automate the creation such a transaction using a wallet script.
