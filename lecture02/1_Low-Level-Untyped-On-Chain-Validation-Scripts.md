@@ -25,6 +25,8 @@ data Data =
   deriving anyclass (NFData)
 ```
 
+### Constructors
+
 As shown above, Data has five constructors:
 
 1. **Constr** taking an Integer and a recursive list of Data
@@ -34,6 +36,8 @@ As shown above, Data has five constructors:
 5. **B** taking a ByteString
 
 Keep in mind that each of the five constructors above is essentially a function with an arbitrary number of parameters that returns the value of type Data.
+
+### Deriving Clauses
 
 The "deriving" keyword above is used to derive the behaviour of Data from existing type classes, i.e.:
 
@@ -53,7 +57,7 @@ More information on Haskell types and typeclasses can be found [here](http://lea
 
 Validators exist as Plutus Core scripts that live on the Cardano blockchain. Fortunately, these can be written in Haskell first and then compiled into Plutus Core. This involves several steps.
 
-### [mkValidator](https://youtu.be/sN3BIa3GAOc?t=744)
+### Function: [mkValidator](https://youtu.be/sN3BIa3GAOc?t=744)
 
 First, it is necessary to define a Haskell function (mkValidator) that will represent our validator.
 
@@ -77,5 +81,42 @@ mkValidator _ _ _ = ()
 ```
 
 In this case, mkValidator will pass every time because it completely ignores the datum, redeemer, and context by returning unit unconditionally.
+
+### Function: [validator](https://youtu.be/sN3BIa3GAOc)
+
+Once mkValidator has been defined, it needs to be converted into a validator of type Validator by compiling it into a Plutus script using Template Haskell.
+
+```haskell
+validator :: Validator
+validator = mkValidatorScript $$(PlutusTx.compile [|| mkValidator ||])
+```
+
+Here's what's going on under the hood:
+
+1. The Oxford brackets used in `|| mkValidator ||` serve to "quote" the mkValidator function into its underlying syntax tree.
+
+2. The `PlutusTx.compile` receives that syntax tree and compiles it into a Plutus Core syntax tree
+
+3. The splice denoted by `$$` splices the Plutus Core syntax tree as a Plutus Core expression into the source code at that point
+
+4. The `mkValidatorScript` converts the spliced Plutus Core expression into a Validator
+
+Template Haskell is used here because it allows us to evaluate and expand an expression into source code, and then splice that generated source code into the rest of the source code at compile time.
+
+### Pragma: [INLINABLE](https://youtu.be/sN3BIa3GAOc?t=1646)
+
+Because Oxford brackets require all function references to be made inline, it is a necessary final step to add an [INLINABLE pragma](https://wiki.haskell.org/Inlining_and_Specialisation) directive to our mkValidator function.
+
+This gives rise to the following final source code:
+
+
+```haskell
+{-# INLINABLE mkValidator #-}
+mkValidator :: Data -> Data -> Data -> ()
+mkValidator _ _ _ = ()
+
+validator :: Validator
+validator = mkValidatorScript $$(PlutusTx.compile [|| mkValidator ||])
+```
 
 ## More Notes Soon...
