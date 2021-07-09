@@ -45,6 +45,8 @@ The "deriving" keyword above is used to derive the behaviour of Data from existi
 
 Two deriving clauses are used in conjuction with two [deriving strategies](https://typeclasses.com/ghc/deriving-strategies), which specify which deriving mechanism to use for the type classes listed in each clause.
 
+For all intents and purposes, Data can be thought of as a blob type similar to what a JSON object would accomplish in other languages.
+
 More information on Haskell types and typeclasses can be found [here](http://learnyouahaskell.com/making-our-own-types-and-typeclasses#algebraic-data-types).
 
 
