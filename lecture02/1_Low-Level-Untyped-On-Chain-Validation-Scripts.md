@@ -10,9 +10,9 @@ Specifically, on-chain validation centers on three pieces of data that a Plutus 
 
 Within the scope of Plutus, these three pieces of data are represented by a concrete Haskell data type, which under the low-level implementation of Plutus, is a single shared data type called "Data." In practice, more suitable higher-level data types are used as representations.
 
-## Data Type: [Data](https://youtu.be/sN3BIa3GAOc?t=432)
+## Type: [Data](https://youtu.be/sN3BIa3GAOc?t=432)
 
-The low-level Data data type is defined as follows:
+The low-level Data type is defined as follows:
 
 ```haskell
 data Data =
@@ -33,8 +33,20 @@ As shown above, Data has five constructors:
 4. **I** taking an Integer
 5. **B** taking a ByteString
 
-Keep in mind that each of the five constructors above is essentially a function with an arbitrary number of parameters that returns the value of Data.
+Keep in mind that each of the five constructors above is essentially a function with an arbitrary number of parameters that returns the value of type Data.
+
+The "deriving" keyword above is used to derive the behaviour of Data from existing type classes, i.e.:
+
+- Show
+- Eq
+- Ord
+- Generic
+- NFData
+
+Two deriving clauses are used in conjuction with two [deriving strategies](https://typeclasses.com/ghc/deriving-strategies), which specify which deriving mechanism to use for the type classes listed in each clause.
 
 More information on Haskell types and typeclasses can be found [here](http://learnyouahaskell.com/making-our-own-types-and-typeclasses#algebraic-data-types).
+
+
 
 ## More Notes Soon...
