@@ -119,4 +119,26 @@ validator :: Validator
 validator = mkValidatorScript $$(PlutusTx.compile [|| mkValidator ||])
 ```
 
+## [Transforming a Validator](https://youtu.be/sN3BIa3GAOc?t=1868)
+
+### Function: [valHash](https://youtu.be/sN3BIa3GAOc?t=1876)
+
+A validator can be transformed into a hash of type Ledger.ValidatorHash using the Script.validatorHash utility:
+
+```haskell
+valHash :: Ledger.ValidatorHash
+valHash = Scripts.validatorHash validator
+```
+
+### Function: [scrAddress](https://youtu.be/sN3BIa3GAOc?t=1894)
+
+A validator can be also be transformed into a script address of type Ledger.Address using the scriptAdress utility:
+
+```haskell
+scrAdress :: Ledger.Address
+scrAdress = scriptAdress validator
+```
+
+Keep in mind that the validator hash is a primary component of the script address.
+
 ## More Notes Soon...
