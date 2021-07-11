@@ -119,6 +119,53 @@ validator :: Validator
 validator = mkValidatorScript $$(PlutusTx.compile [|| mkValidator ||])
 ```
 
+## [Failing a Validator](https://youtu.be/sN3BIa3GAOc?t=2794)
+
+At this point, we've seen how to write a validator that passes unconditionally.
+
+If we wish to cause a transaction to fail, we need to throw an error. In this case, we do not use the standard Haskell error, which has a signature of:
+
+```haskell
+error :: [Char] -> a
+```
+
+Instead, we use a custom error of type PlutusTx.Prelude.error, which has a signature of:
+
+```haskell
+PlutusTx.Prelude.error :: () -> a
+```
+
+The PlutusTx.Prelude.error can be accessed via import after disabling the Haskell implicit Prelude imports:
+
+```haskell
+{-# LANGUAGE NoImplicitPrelude #-}
+
+module Week02.Example where
+
+import PlutusTx.Prelude hiding (Semigroup(..), unless)
+```
+
+Below is an example of a mkValidator function that fails unconditionally:
+
+```Haskell
+mkValidator :: Data -> Data -> Data -> ()
+mkValidator _ _ _ = error ()
+```
+
+Alternatively, errors can be made more insightful by using a PlutusTx.Prelude.traceError with an accompanied ByteString:
+
+```Haskell
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
+
+module Week02.Example where
+
+import PlutusTx.Prelude hiding (Semigroup(..), unless)
+
+mkValidator :: Data -> Data -> Data -> ()
+mkValidator _ _ _ = traceError "Error Message"
+```
+
 ## [Transforming a Validator](https://youtu.be/sN3BIa3GAOc?t=1868)
 
 ### Function: [valHash](https://youtu.be/sN3BIa3GAOc?t=1876)
