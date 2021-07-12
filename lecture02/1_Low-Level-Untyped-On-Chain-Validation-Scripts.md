@@ -203,5 +203,3 @@ scrAdress = scriptAdress validator
 ```
 
 Keep in mind that the validator hash is a primary component of the script address.
-
-## More Notes Soon...
