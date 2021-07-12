@@ -166,6 +166,19 @@ mkValidator :: Data -> Data -> Data -> ()
 mkValidator _ _ _ = traceError "Error Message"
 ```
 
+## Example: [A (Slightly) More Practical Validator](https://youtu.be/sN3BIa3GAOc?t=3270)
+
+Up until this point, we've completely ignored the datum, redeemer, and context when writing validators.
+
+Below is an example of a validator that passes if the value of the redeemer is I 42 of type Data, and fails otherwise:
+
+```haskell
+mkValidator :: Data -> Data -> Data -> ()
+mkValidator _ r _
+    | r == I 42 = ()
+    | otherwise = traceError "Incorrect Redeemer"
+```
+
 ## [Transforming a Validator](https://youtu.be/sN3BIa3GAOc?t=1868)
 
 ### Function: [valHash](https://youtu.be/sN3BIa3GAOc?t=1876)
