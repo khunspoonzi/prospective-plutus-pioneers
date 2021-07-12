@@ -177,6 +177,9 @@ mkValidator :: Data -> Data -> Data -> ()
 mkValidator _ r _
     | r == I 42 = ()
     | otherwise = traceError "Incorrect Redeemer"
+
+validator :: Validator
+validator = mkValidatorScript $$(PlutusTx.compile [|| mkValidator ||])
 ```
 
 ## [Transforming a Validator](https://youtu.be/sN3BIa3GAOc?t=1868)
