@@ -9,9 +9,6 @@ Below is a higher-level implementation of the [(slightly) more practical validat
 ```haskell
 mkValidator :: () -> Integer -> ScriptContext -> Bool
 mkValidator _ r _ = traceIfFalse "Incorrect Redeemer" $ r == 42
-
-validator :: Validator
-validator = mkValidatorScript $$(PlutusTx.compile [|| mkValidator ||])
 ```
 
 In the above implementation, we are able to provide a much stronger type definition for mkValidator's expected argument parameters, as opposed to the much more general expectation of three instances of Data.
