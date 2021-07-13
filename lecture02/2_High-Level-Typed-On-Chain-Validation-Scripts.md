@@ -19,7 +19,7 @@ Notice also that mkValidator no longer returns a unit (which is unusal in Haskel
 
 PlutusTx.Prelude.traceIfFalse is used in place of PlutusTx.Prelude.traceError, and it takes a string and a boolean as arguments, returns the boolean, and logs the string if the boolean is False, i.e. the validation fails.
 
-## [Adapting the Validator Boilerplate](https://youtu.be/sN3BIa3GAOc?t=3736)
+## [Writing a Typed Validator](https://youtu.be/sN3BIa3GAOc?t=3736)
 
 Unfortunately, converting a mkValidator function into a validator under a higher-level implementation requires some extra boilerplate in order to work.
 
@@ -47,9 +47,44 @@ typedValidator = Scripts.mkTypedValidator @Typed
     wrap = Scripts.wrapValidator @() @Integer
 ```
 
-As before, we use PlutusTx.compile to compile mkValidator, but then also compile a wrap function using Scripts.wrapValidator that accepts datum and redeemer type arguments.
+As before, we use PlutusTx.compile to compile mkValidator, but then also compile a wrap function using Scripts.wrapValidator that accepts datum and redeemer type arguments so that the typed validator can be interpretted as an untyped validator.
 
-This is done so that the typed validator can be interpretted as an untyped validator.
+Specifically, the wrap function handles conversion of the datum, redeemer, and context types, (e.g. Unit, Integer, and ScriptContext) into Data. This is done using the PlutusTx.IsData class which houses two related functions:
 
+1. **toData,** which converts a value of type a to Data
+2. **fromData,** which converts Data to a value of type Maybe a
+
+### Function: [validator](https://youtu.be/sN3BIa3GAOc?t=3858)
+
+Once mkValidator has been compiled into a typed validator, it needs to be converted into an untyped validator using Scripts.validatorScript:
+
+```haskell
+validator :: Validator
+validator = Scripts.validatorScript typedValidator
+```
+
+## [Transforming a Typed Validator](https://youtu.be/sN3BIa3GAOc?t=3872)
+
+### Function: [valHash](https://youtu.be/sN3BIa3GAOc?t=3872)
+
+A typed validator can be transformed into a hash of type Ledger.ValidatorHash using the Scripts.validatorHash utility:
+
+```haskell
+valHash :: Ledger.ValidatorHash
+valHash = Scripts.validatorHash typedValidator
+```
+
+**Note:** Scripts.validatorHash comes from a different module than in the case of an untyped validator in the previous section!
+
+### Function: [scrAddress](https://youtu.be/sN3BIa3GAOc?t=3898)
+
+A validator can be also be transformed into a script address of type Ledger.Address using the scriptAdress utility:
+
+```haskell
+scrAdress :: Ledger.Address
+scrAdress = scriptAdress validator
+```
+
+Keep in mind that the validator hash is a primary component of the script address.
 
 ## More Notes Soon...

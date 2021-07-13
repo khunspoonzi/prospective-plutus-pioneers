@@ -186,7 +186,7 @@ validator = mkValidatorScript $$(PlutusTx.compile [|| mkValidator ||])
 
 ### Function: [valHash](https://youtu.be/sN3BIa3GAOc?t=1876)
 
-A validator can be transformed into a hash of type Ledger.ValidatorHash using the Script.validatorHash utility:
+A validator can be transformed into a hash of type Ledger.ValidatorHash using the Scripts.validatorHash utility:
 
 ```haskell
 valHash :: Ledger.ValidatorHash
