@@ -195,11 +195,11 @@ valHash = Scripts.validatorHash validator
 
 ### Function: [scrAddress](https://youtu.be/sN3BIa3GAOc?t=1894)
 
-A validator can be also be transformed into a script address of type Ledger.Address using the scriptAdress utility:
+A validator can be also be transformed into a script address of type Ledger.Address using the scriptAddress utility:
 
 ```haskell
-scrAdress :: Ledger.Address
-scrAdress = scriptAdress validator
+scrAddress :: Ledger.Address
+scrAddress = scriptAddress validator
 ```
 
 Keep in mind that the validator hash is a primary component of the script address.
