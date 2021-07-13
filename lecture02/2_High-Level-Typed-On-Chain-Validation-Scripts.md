@@ -19,5 +19,37 @@ Notice also that mkValidator no longer returns a unit (which is unusal in Haskel
 
 PlutusTx.Prelude.traceIfFalse is used in place of PlutusTx.Prelude.traceError, and it takes a string and a boolean as arguments, returns the boolean, and logs the string if the boolean is False, i.e. the validation fails.
 
+## [Adapting the Validator Boilerplate](https://youtu.be/sN3BIa3GAOc?t=3736)
+
+Unfortunately, converting a mkValidator function into a validator under a higher-level implementation requires some extra boilerplate in order to work.
+
+### Type: [Typed](https://youtu.be/sN3BIa3GAOc?t=3748)
+
+First of all, we need to introduce a dummy data type called Typed (in this case) that derives from Scripts.ValidatorTypes where the Typed instance of DatumType is a unit and the Typed instance of RedeemerType is an Integer, as per mkValidator.
+
+```haskell
+data Typed
+instance Scripts.ValidatorTypes Typed where
+    type instance DatumType Typed = ()
+    type instance RedeemerType Typed = Integer
+```
+
+### Function: [typedValidator](https://youtu.be/sN3BIa3GAOc?t=3784)
+
+In order to compile mkValidator, Scripts.mkTypedValidator is used with Typed supplied as a type argument:
+
+```haskell
+typedValidator :: Scripts.TypedValidator Typed
+typedValidator = Scripts.mkTypedValidator @Typed
+    $$(PlutusTx.compile [|| mkValidator ||])
+    $$(PlutusTx.compile [|| wrap ||])
+  where
+    wrap = Scripts.wrapValidator @() @Integer
+```
+
+As before, we use PlutusTx.compile to compile mkValidator, but then also compile a wrap function using Scripts.wrapValidator that accepts datum and redeemer type arguments.
+
+This is done so that the typed validator can be interpretted as an untyped validator.
+
 
 ## More Notes Soon...
