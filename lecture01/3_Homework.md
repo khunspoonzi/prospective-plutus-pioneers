@@ -65,6 +65,8 @@ The following steps were carried out on a Linux-based operating system.
 
         `sudo mount --bind /path/to/spacious/dir/nix/store /nix/store`
 
+        **Note:** You need to re-mount these directories upon re-start. See [this](https://askubuntu.com/questions/650800/symbolic-links-lost-after-restart) for info on automating that.
+
     More info [here](https://forum.holochain.org/t/install-nix-to-custom-location/4221)
 
 
