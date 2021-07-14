@@ -63,6 +63,28 @@ validator :: Validator
 validator = Scripts.validatorScript typedValidator
 ```
 
+The final script would look like this:
+
+```haskell
+mkValidator :: () -> Integer -> ScriptContext -> Bool
+mkValidator _ r _ = traceIfFalse "Incorrect Redeemer" $ r == 42
+
+data Typed
+instance Scripts.ValidatorTypes Typed where
+    type instance DatumType Typed = ()
+    type instance RedeemerType Typed = Integer
+
+typedValidator :: Scripts.TypedValidator Typed
+typedValidator = Scripts.mkTypedValidator @Typed
+    $$(PlutusTx.compile [|| mkValidator ||])
+    $$(PlutusTx.compile [|| wrap ||])
+  where
+    wrap = Scripts.wrapValidator @() @Integer
+
+validator :: Validator
+validator = Scripts.validatorScript typedValidator
+```
+
 ## [Transforming a Typed Validator](https://youtu.be/sN3BIa3GAOc?t=3872)
 
 ### Function: [valHash](https://youtu.be/sN3BIa3GAOc?t=3872)
@@ -87,4 +109,34 @@ scrAddress = scriptAddress validator
 
 Keep in mind that the validator hash is a primary component of the script address.
 
-## More Notes Soon...
+## [Working with Custom Data Types](https://youtu.be/sN3BIa3GAOc?t=4264)
+
+The toData and fromData utility functions work well for general typed validator use cases.
+
+However, they may not be sufficient alone in cases where we wish to use custom data types, as we'd need to write instances of the isData class for our custom types.
+
+Fortunately, we can utilize PlutusTx.unstableMakeIsData, which is a template Haskell function that accepts a custom type denoted by two single quotes, writes a custom IsData instance, and splices it in at compile time:
+
+
+```haskell
+newtype CustomRedeemer = CustomRedeemer Integer
+
+PlutusTx.unstableMakeIsData ''CustomRedeemer
+
+mkValidator :: () -> CustomRedeemer -> ScriptContext -> Bool
+mkValidator _ (CustomRedeemer r)  _ = traceIfFalse "Incorrect Redeemer" $ r == 42
+
+data Typed
+instance Scripts.ValidatorTypes Typed where
+    type instance DatumType Typed = ()
+    type instance RedeemerType Typed = CustomRedeemer
+
+typedValidator :: Scripts.TypedValidator Typed
+typedValidator = Scripts.mkTypedValidator @Typed
+    $$(PlutusTx.compile [|| mkValidator ||])
+    $$(PlutusTx.compile [|| wrap ||])
+  where
+    wrap = Scripts.wrapValidator @() @CustomRedeemer
+```
+
+**Note:** There is a stable version of PlutusTx.unstableMakeIsData which should be used for production code, which preserves constructor enumeration across versions.
