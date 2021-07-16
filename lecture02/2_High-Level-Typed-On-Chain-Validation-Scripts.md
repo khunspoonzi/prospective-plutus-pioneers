@@ -7,6 +7,7 @@ In practice, it would be uncommon for anyone to write the kind of low-level vali
 Below is a higher-level implementation of the [(slightly) more practical validator](./1_Low-Level-Untyped-On-Chain-Validation-Scripts.md#example-a-slightly-more-practical-validator) example we saw in the previous section:
 
 ```haskell
+{-# INLINABLE mkValidator #-}
 mkValidator :: () -> Integer -> ScriptContext -> Bool
 mkValidator _ r _ = traceIfFalse "Incorrect Redeemer" $ r == 42
 ```
@@ -66,6 +67,7 @@ validator = Scripts.validatorScript typedValidator
 The final script would look like this:
 
 ```haskell
+{-# INLINABLE mkValidator #-}
 mkValidator :: () -> Integer -> ScriptContext -> Bool
 mkValidator _ r _ = traceIfFalse "Incorrect Redeemer" $ r == 42
 
@@ -123,6 +125,7 @@ newtype CustomRedeemer = CustomRedeemer Integer
 
 PlutusTx.unstableMakeIsData ''CustomRedeemer
 
+{-# INLINABLE mkValidator #-}
 mkValidator :: () -> CustomRedeemer -> ScriptContext -> Bool
 mkValidator _ (CustomRedeemer r)  _ = traceIfFalse "Incorrect Redeemer" $ r == 42
 

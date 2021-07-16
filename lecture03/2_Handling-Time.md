@@ -87,5 +87,3 @@ before :: Ord a => a -> Interval a -> Bool
 after :: Ord a => a -> Interval a -> Bool
 
 ```
-
-### More notes soon...
