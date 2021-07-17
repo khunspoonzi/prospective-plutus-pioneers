@@ -121,3 +121,29 @@ valHash = Scripts.validatorHash typedValidator
 scrAddress :: Ledger.Address
 scrAddress = scriptAddress validator
 ```
+
+## [Utility Functions](https://youtu.be/6_rfCCY9_gY?t=2504)
+
+### Function: [pubKeyHash](https://youtu.be/6_rfCCY9_gY?t=2550)
+
+The pubKeyHash function is useful if you wish to obtain the public key hash of a given wallet within the Plutus Playground:
+
+```haskell
+import Ledger
+import Wallet.Emulator
+
+pubKeyHash $ walletPubKey $ Wallet 1
+```
+
+### Function: [slotToBeginPOSIXTime](https://youtu.be/6_rfCCY9_gY?t=2726)
+
+The slotToBeginPOSIXTime function is useful if you wish to convert the start of a given slot to POSIX time:
+
+```haskell
+import Data.Default
+import Ledger.TimeSlot
+
+slotToBeginPOSIXTime def 20
+```
+
+**Note:** The def argument in the above snippet refers to a default SlotConfig which is an instance of Default.
