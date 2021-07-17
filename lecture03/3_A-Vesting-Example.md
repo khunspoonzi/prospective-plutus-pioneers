@@ -63,4 +63,61 @@ instance Scripts.ValidatorTypes Vesting where
     type instance RedeemerType Vesting = ()
 ```
 
-### More notes soon...
+## Function: [typedValidator](https://youtu.be/6_rfCCY9_gY?t=1896)
+
+Obviously, the Vesting and VestingDatum types would need to then be used when compiling the typedValidator:
+
+```haskell
+typedValidator :: Scripts.TypedValidator Vesting
+typedValidator = Scripts.mkTypedValidator @Vesting
+    $$(PlutusTx.compile [|| mkValidator ||])
+    $$(PlutusTx.compile [|| wrap ||])
+  where
+    wrap = Scripts.wrapValidator @VestingDatum @()
+```
+
+## Final Off-chain Validation Script
+
+Combining the above components, our final off-chain validation script would look like this:
+
+```haskell
+data VestingDatum = VestingDatum
+    { beneficiary :: PubKeyHash
+    , deadline    :: POSIXTime
+    } deriving Show
+
+PlutusTx.unstableMakeIsData ''VestingDatum
+
+{-# INLINABLE mkValidator #-}
+mkValidator :: VestingDatum -> () -> ScriptContext -> Bool
+mkValidator dat () ctx = traceIfFalse "Beneficiary signature missing" signedByBeneficiary &&
+                         traceIfFalse "Deadline not yet reached ... " deadlineReached
+  where
+
+    info :: TxInfo
+    info = scriptContextTxInfo ctx
+
+    signedByBeneficiary :: Bool
+    signedByBeneficiary = txSignedBy info $ beneficiary dat
+
+    deadlineReached :: Bool
+    deadlineReached = contains (from $ deadline dat) $ txInfoValidRange info
+
+data Vesting
+instance Scripts.ValidatorTypes Vesting where
+    type instance DatumType Vesting = VestingDatum
+    type instance RedeemerType Vesting = ()
+
+typedValidator :: Scripts.TypedValidator Vesting
+typedValidator = Scripts.mkTypedValidator @Vesting
+    $$(PlutusTx.compile [|| mkValidator ||])
+    $$(PlutusTx.compile [|| wrap ||])
+  where
+    wrap = Scripts.wrapValidator @VestingDatum @()
+
+valHash :: Ledger.ValidatorHash
+valHash = Scripts.validatorHash typedValidator
+
+scrAddress :: Ledger.Address
+scrAddress = scriptAddress validator
+```
