@@ -105,7 +105,7 @@ Template Haskell is used here because it allows us to evaluate and expand an exp
 
 ### Pragma: [INLINABLE](https://youtu.be/sN3BIa3GAOc?t=1646)
 
-Because Oxford brackets require all function references to be made inline, it is a necessary final step to add an [INLINABLE pragma](https://wiki.haskell.org/Inlining_and_Specialisation) directive to our mkValidator function.
+Because Oxford brackets normally require all function references to be made inline, it is a necessary final step to add an [INLINABLE pragma](https://wiki.haskell.org/Inlining_and_Specialisation) directive to our mkValidator function.
 
 This gives rise to the following final source code:
 
