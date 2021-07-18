@@ -68,7 +68,7 @@ typedValidator p = Scripts.mkTypedValidator @Vesting
 
 Importantly however, the above code **will not** compile successfully.
 
-As discussed in a [previous section](../lecture02/1_Low-Level-Untyped-On-Chain-Validation-Scripts.md#pragma-inlinable) concerning template Haskell, everything specified within Oxford brackets must be known at compile time.
+As discussed [previously](../lecture02/1_Low-Level-Untyped-On-Chain-Validation-Scripts.md#pragma-inlinable) concerning template Haskell, everything specified within Oxford brackets must be known at compile time.
 
 In the example above however, the the value of mkValidator is known at compile time, but the value of p is only known at run time. As such we cannot simply apply p to mkValidator when compiling Plutus Core.
 
