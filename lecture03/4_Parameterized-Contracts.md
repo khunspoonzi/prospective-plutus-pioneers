@@ -93,7 +93,7 @@ PlutusTx.makeLift ''VestingParam
 
 typedValidator :: VestingParam -> Scripts.TypedValidator Vesting
 typedValidator p = Scripts.mkTypedValidator @Vesting
-    ($$(PlutusTx.compile [|| mkValidator ||]) `PkutusTx.applyCode` PlutusTx.liftCode p)
+    ($$(PlutusTx.compile [|| mkValidator ||]) `PlutusTx.applyCode` PlutusTx.liftCode p)
     $$(PlutusTx.compile [|| wrap ||])
   where
     wrap = Scripts.wrapValidator @() @()
@@ -135,7 +135,7 @@ instance Scripts.ValidatorTypes Vesting where
 
 typedValidator :: VestingParam -> Scripts.TypedValidator Vesting
 typedValidator p = Scripts.mkTypedValidator @Vesting
-    ($$(PlutusTx.compile [|| mkValidator ||]) `PkutusTx.applyCode` PlutusTx.liftCode p)
+    ($$(PlutusTx.compile [|| mkValidator ||]) `PlutusTx.applyCode` PlutusTx.liftCode p)
     $$(PlutusTx.compile [|| wrap ||])
   where
     wrap = Scripts.wrapValidator @() @()
