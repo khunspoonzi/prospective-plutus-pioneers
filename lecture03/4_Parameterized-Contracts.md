@@ -70,6 +70,84 @@ Importantly however, the above code **will not** compile successfully.
 
 As discussed [previously](../lecture02/1_Low-Level-Untyped-On-Chain-Validation-Scripts.md#pragma-inlinable) concerning template Haskell, everything specified within Oxford brackets must be known at compile time.
 
-In the example above however, the the value of mkValidator is known at compile time, but the value of p is only known at run time. As such we cannot simply apply p to mkValidator when compiling Plutus Core.
+In the example above however, the the value of mkValidator is known at compile time, but the value of p is only known at run time. As such we cannot simply apply p to mkValidator when compiling Plutus Core at compile time.
 
-### More notes soon...
+Therefore, our only solution will be to compile mkValidator, and then somehow apply a compiled p to that at run time.
+
+Fortunately, because i`p :: VestingParam` is a Data-like type, we can achieve this by using the following PlutusTx utility functions:
+
+```haskell
+makeLift :: Name -> Q [Dec]
+
+liftCode :: (Lift uni a, Throwable uni fun, ToBuiltinMeaning uni fun) => a -> CompiledCodeIn uni fun a
+
+applyCode :: (Closed uni, uni `Everywhere` Flat, Flat fun) => CompiledCodeIn uni fun (a -> b) -> CompiledCodeIn uni fun a -> CompiledCodeIn uni fun b
+```
+
+The above utility functions can be used as follows:
+
+```haskell
+{-# MultiParamTypeClasses #-}
+
+PlutusTx.makeLift ''VestingParam
+
+typedValidator :: VestingParam -> Scripts.TypedValidator Vesting
+typedValidator p = Scripts.mkTypedValidator @Vesting
+    ($$(PlutusTx.compile [|| mkValidator ||]) `PkutusTx.applyCode` PlutusTx.liftCode p)
+    $$(PlutusTx.compile [|| wrap ||])
+  where
+    wrap = Scripts.wrapValidator @() @()
+```
+
+## Final Off-chain Validation Script
+
+Combining the above components, our final off-chain validation script would look like this:
+
+```haskell
+{-# MultiParamTypeClasses #-}
+
+data VestingParam = VestingParam
+    { beneficiary :: PubKeyHash
+    , deadline    :: POSIXTime
+    } deriving Show
+
+PlutusTx.makeLift ''VestingParam
+
+{-# INLINABLE mkValidator #-}
+mkValidator :: VestingParam -> () -> () -> ScriptContext -> Bool
+mkValidator p () () ctx = traceIfFalse "Beneficiary signature missing" signedByBeneficiary &&
+                          traceIfFalse "Deadline not yet reached ... " deadlineReached
+  where
+
+    info :: TxInfo
+    info = scriptContextTxInfo ctx
+
+    signedByBeneficiary :: Bool
+    signedByBeneficiary = txSignedBy info $ beneficiary p
+
+    deadlineReached :: Bool
+    deadlineReached = contains (from $ deadline p) $ txInfoValidRange info
+
+data Vesting
+instance Scripts.ValidatorTypes Vesting where
+    type instance DatumType Vesting = ()
+    type instance RedeemerType Vesting = ()
+
+typedValidator :: VestingParam -> Scripts.TypedValidator Vesting
+typedValidator p = Scripts.mkTypedValidator @Vesting
+    ($$(PlutusTx.compile [|| mkValidator ||]) `PkutusTx.applyCode` PlutusTx.liftCode p)
+    $$(PlutusTx.compile [|| wrap ||])
+  where
+    wrap = Scripts.wrapValidator @() @()
+
+validator :: VestingParam -> Validator
+validator = Scripts.validatorScript . typedValidator -- Implicit p applied to composed funtion
+
+valHash :: VestingParam -> Ledger.ValidatorHash
+valHash = Scripts.validatorHash . typedValidator -- Implicit p applied to composed funtion
+
+scrAddress :: VestingParam -> Ledger.Address
+scrAddress = scriptAddress . validator -- Implicit p applied to composed funtion
+```
+
+**Note:** The above excludes the various pragmas and imports that are assumed as general to all validation scripts.
