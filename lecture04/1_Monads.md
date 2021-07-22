@@ -35,3 +35,68 @@ Here is an example of Hello World:
 main :: IO ()
 main = putStrLn "Hello World"
 ```
+
+## [Complex Actions](https://youtu.be/g4lvA14I-Jg?t=1080)
+
+Since no amount of built-ins would be enough to to acommodate a potentially infinite number of use-cases, more complex actions can be achieved by using certain functions and combinators.
+
+### Function: [fmap](https://youtu.be/g4lvA14I-Jg?t=1100)
+
+Monads like IO have a Functor instance which has a useful method called fmap:
+
+```haskell
+fmap :: (a -> b) -> f a -> f b
+```
+
+In practice, fmap allows us to convert `f a` to `f b` given a function that accpets an `a` and returns a `b`. Below is an example of how this would be used to augment an `IO String` monad:
+
+```haskell
+import Data.Char
+
+fmap (map toUpper) getLine
+```
+
+In the above example, the result of getLine is being transformed before being returned as `IO String` as if `map toUpper` were inserted into the very end of getLine. Notably, this would be different from trying to do the following:
+
+```haskell
+(map toUpper) . getLine
+```
+
+The above would not work because the return type of `getLine :: IO String` would not match the expected type of `(map toUpper) :: [Char] -> [Char]`
+
+### Operator: [sequence (>>)](https://youtu.be/g4lvA14I-Jg?t=1310)
+
+We can also chain monads like IO together into a defined sequence using the sequence operator:
+
+```haskell
+putStrLn "Hello" >> putStrLn "World"
+```
+
+In the above example, two IO actions are performed sequentially, with the result of the first being disregarded.
+
+### Operator: [bind (>>=)](https://youtu.be/g4lvA14I-Jg?t=1382)
+
+Similar to the sequence operator is the bind operator, which does not disregard the result of the preceding action.
+
+```haskell
+getLine >>= putStrLn
+```
+
+In the case of bind, the result of the preceding action is passed into the subsequent action. Here is a more complex example:
+
+```haskell
+bar :: IO ()
+bar = getLine >>= \s ->
+      getLine >>= \t ->
+      putStrLn (s ++ t)
+```
+
+### Function: [return](https://youtu.be/g4lvA14I-Jg?t=1504)
+
+The return function is useful for converting a general value into a monad, for instance:
+
+```haskell
+return "Haskell" :: IO String
+```
+
+### More Notes Soon...
