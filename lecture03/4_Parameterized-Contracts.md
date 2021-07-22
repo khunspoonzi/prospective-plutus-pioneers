@@ -99,7 +99,7 @@ typedValidator p = Scripts.mkTypedValidator @Vesting
     wrap = Scripts.wrapValidator @() @()
 ```
 
-## Final Off-chain Validation Script
+## Final Validation Script
 
 Combining the above components, our final off-chain validation script would look like this:
 
