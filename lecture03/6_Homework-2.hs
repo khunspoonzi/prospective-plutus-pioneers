@@ -2,17 +2,18 @@
 -- EXTENSIONS
 ----------------------------------------------------------------------------------------
 
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE DeriveAnyClass      #-}
-{-# LANGUAGE DeriveGeneric       #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell     #-}
-{-# LANGUAGE TypeApplications    #-}
-{-# LANGUAGE TypeFamilies        #-}
-{-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DeriveAnyClass        #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeOperators         #-}
 
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 
@@ -20,7 +21,7 @@
 -- IMPORTS
 ----------------------------------------------------------------------------------------
 
-module Week03.Homework1 where
+module Week03.Homework2 where
 
 import           Control.Monad           hiding ( fmap )
 import           Data.Aeson                     ( FromJSON
@@ -46,67 +47,38 @@ import           Playground.TH                  ( mkKnownCurrencies
 import           Playground.Types               ( KnownCurrency(..) )
 import           Plutus.Contract
 import qualified PlutusTx
-import           PlutusTx.Prelude        hiding ( unless )
-import           Prelude                        ( IO )
-import qualified Prelude                       as P
+import           PlutusTx.Prelude        hiding ( Semigroup(..)
+                                                , unless
+                                                )
+import           Prelude                        ( IO
+                                                , Semigroup(..)
+                                                , Show(..)
+                                                , String
+                                                , undefined
+                                                )
 import           Text.Printf                    ( printf )
-
-----------------------------------------------------------------------------------------
--- VESTING DATUM
-----------------------------------------------------------------------------------------
-
-data VestingDatum = VestingDatum
-  { beneficiary1 :: PubKeyHash
-  , beneficiary2 :: PubKeyHash
-  , deadline     :: POSIXTime
-  }
-  deriving P.Show
-
-PlutusTx.unstableMakeIsData ''VestingDatum
 
 ----------------------------------------------------------------------------------------
 -- MK VALIDATOR
 ----------------------------------------------------------------------------------------
 
 {-# INLINABLE mkValidator #-}
-mkValidator :: VestingDatum -> () -> ScriptContext -> Bool
-mkValidator dat () ctx = signedByBeneficiary && beneficiaryRespectsDeadline
+mkValidator :: PubKeyHash -> POSIXTime -> () -> ScriptContext -> Bool
+mkValidator b d () ctx =
+
+  traceIfFalse "Beneficiary signature missing" signedByBeneficiary
+    && traceIfFalse "Deadline not yet reached" deadlineReached
 
  where
 
-  -- Extract tx info
   info :: TxInfo
   info = scriptContextTxInfo ctx
 
-  -- Determine if beneficiary 1 has signed
-  signedByBeneficiary1 :: Bool
-  signedByBeneficiary1 = txSignedBy info $ beneficiary1 dat
-
-  -- Determine if beneficiary 2 has signed
-  signedByBeneficiary2 :: Bool
-  signedByBeneficiary2 = txSignedBy info $ beneficiary2 dat
-
-  -- Determine if either beneficiary has signed
   signedByBeneficiary :: Bool
-  signedByBeneficiary = traceIfFalse
-    "Beneficiary signature missing"
-    (signedByBeneficiary1 || signedByBeneficiary2)
+  signedByBeneficiary = txSignedBy info b
 
-  -- Determine if deadline has passed
-  deadlinePassed :: Bool
-  deadlinePassed = contains (from $ (1 + deadline dat)) $ txInfoValidRange info
-
-  -- Determine if signing beneficiary respects deadline
-  beneficiaryRespectsDeadline :: Bool
-  beneficiaryRespectsDeadline
-    | signedByBeneficiary1
-      && (traceIfFalse "Deadline has already passed" (not deadlinePassed))
-    = True
-    | signedByBeneficiary2
-      && (traceIfFalse "Deadline has not yet passed" deadlinePassed)
-    = True
-    | otherwise
-    = False
+  deadlineReached :: Bool
+  deadlineReached = contains (from d) $ txInfoValidRange info
 
 ----------------------------------------------------------------------------------------
 -- VESTING
@@ -114,36 +86,33 @@ mkValidator dat () ctx = signedByBeneficiary && beneficiaryRespectsDeadline
 
 data Vesting
 instance Scripts.ValidatorTypes Vesting where
-  type DatumType Vesting = VestingDatum
+  type DatumType Vesting = POSIXTime
   type RedeemerType Vesting = ()
 
 ----------------------------------------------------------------------------------------
 -- TYPED VALIDATOR
 ----------------------------------------------------------------------------------------
 
-typedValidator :: Scripts.TypedValidator Vesting
-typedValidator = Scripts.mkTypedValidator @Vesting
-    $$(PlutusTx.compile [|| mkValidator ||])
+typedValidator :: PubKeyHash -> Scripts.TypedValidator Vesting
+typedValidator b = Scripts.mkTypedValidator @Vesting
+    ($$(PlutusTx.compile [|| mkValidator ||]) `PlutusTx.applyCode` PlutusTx.liftCode b)
     $$(PlutusTx.compile [|| wrap ||])
   where
-    wrap = Scripts.wrapValidator @VestingDatum @()
+    wrap = Scripts.wrapValidator @POSIXTime @()
 
 ----------------------------------------------------------------------------------------
 -- VALIDATOR
 ----------------------------------------------------------------------------------------
 
-validator :: Validator
-validator = Scripts.validatorScript typedValidator
+validator :: PubKeyHash -> Validator
+validator = Scripts.validatorScript . typedValidator
 
 ----------------------------------------------------------------------------------------
--- VAL HASH / SRC ADDRESS
+-- SRC ADDRESS
 ----------------------------------------------------------------------------------------
 
-valHash :: Ledger.ValidatorHash
-valHash = Scripts.validatorHash typedValidator
-
-scrAddress :: Ledger.Address
-scrAddress = scriptAddress validator
+scrAddress :: PubKeyHash -> Ledger.Address
+scrAddress = scriptAddress . validator
 
 ----------------------------------------------------------------------------------------
 -- GIVE PARAMS
@@ -170,19 +139,15 @@ type VestingSchema =
 
 give :: AsContractError e => GiveParams -> Contract w s e ()
 give gp = do
-  pkh <- pubKeyHash <$> ownPubKey
-  let dat = VestingDatum { beneficiary1 = gpBeneficiary gp
-                         , beneficiary2 = pkh
-                         , deadline     = gpDeadline gp
-                         }
-      tx = mustPayToTheScript dat $ Ada.lovelaceValueOf $ gpAmount gp
-  ledgerTx <- submitTxConstraints typedValidator tx
+  let p  = gpBeneficiary gp
+      d  = gpDeadline gp
+      tx = mustPayToTheScript d $ Ada.lovelaceValueOf $ gpAmount gp
+  ledgerTx <- submitTxConstraints (typedValidator p) tx
   void $ awaitTxConfirmed $ txId ledgerTx
-  logInfo @P.String $ printf
-    "made a gift of %d lovelace to %s with deadline %s"
-    (gpAmount gp)
-    (P.show $ gpBeneficiary gp)
-    (P.show $ gpDeadline gp)
+  logInfo @String $ printf "made a gift of %d lovelace to %s with deadline %s"
+                           (gpAmount gp)
+                           (show $ gpBeneficiary gp)
+                           (show $ gpDeadline gp)
 
 ----------------------------------------------------------------------------------------
 -- GRAB
@@ -192,46 +157,32 @@ grab :: forall w s e . AsContractError e => Contract w s e ()
 grab = do
   now   <- currentTime
   pkh   <- pubKeyHash <$> ownPubKey
-  utxos <- utxoAt scrAddress
-  let utxos1 = Map.filter
-        (isSuitable $ \dat -> beneficiary1 dat == pkh && now <= deadline dat)
-        utxos
-      utxos2 = Map.filter
-        (isSuitable $ \dat -> beneficiary2 dat == pkh && now > deadline dat)
-        utxos
-  logInfo @P.String
-    $ printf "found %d gift(s) to grab" (Map.size utxos1 P.+ Map.size utxos2)
-  unless (Map.null utxos1) $ do
-    let orefs   = fst <$> Map.toList utxos1
-        lookups = Constraints.unspentOutputs utxos1
-          P.<> Constraints.otherScript validator
-        tx :: TxConstraints Void Void
-        tx =
-          mconcat
-              [ mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toData ()
-              | oref <- orefs
-              ]
-            P.<> mustValidateIn (to now)
-    void $ submitTxConstraintsWith @Void lookups tx
-  unless (Map.null utxos2) $ do
-    let orefs   = fst <$> Map.toList utxos2
-        lookups = Constraints.unspentOutputs utxos2
-          P.<> Constraints.otherScript validator
-        tx :: TxConstraints Void Void
-        tx =
-          mconcat
-              [ mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toData ()
-              | oref <- orefs
-              ]
-            P.<> mustValidateIn (from now)
-    void $ submitTxConstraintsWith @Void lookups tx
+  utxos <- Map.filter (isSuitable now) <$> utxoAt (scrAddress pkh)
+  if Map.null utxos
+    then logInfo @String $ "no gifts available"
+    else do
+      let orefs   = fst <$> Map.toList utxos
+          lookups = Constraints.unspentOutputs utxos
+            <> Constraints.otherScript (validator pkh)
+          tx :: TxConstraints Void Void
+          tx =
+            mconcat
+                [ mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toData ()
+                | oref <- orefs
+                ]
+              <> mustValidateIn (from now)
+      ledgerTx <- submitTxConstraintsWith @Void lookups tx
+      void $ awaitTxConfirmed $ txId ledgerTx
+      logInfo @String $ "collected gifts"
  where
-  isSuitable :: (VestingDatum -> Bool) -> TxOutTx -> Bool
-  isSuitable p o = case txOutDatumHash $ txOutTxOut o of
+  isSuitable :: POSIXTime -> TxOutTx -> Bool
+  isSuitable now o = case txOutDatumHash $ txOutTxOut o of
     Nothing -> False
     Just h  -> case Map.lookup h $ txData $ txOutTxTx o of
       Nothing        -> False
-      Just (Datum e) -> maybe False p $ PlutusTx.fromData e
+      Just (Datum e) -> case PlutusTx.fromData e of
+        Nothing -> False
+        Just d  -> d <= now
 
 ----------------------------------------------------------------------------------------
 -- ENDPOINTS
