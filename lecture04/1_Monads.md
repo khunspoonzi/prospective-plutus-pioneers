@@ -99,4 +99,47 @@ The return function is useful for converting a general value into a monad, for i
 return "Haskell" :: IO String
 ```
 
-### More Notes Soon...
+## Type: [Maybe](https://youtu.be/g4lvA14I-Jg?t=1730)
+
+The Maybe type is one of Haskell's most useful types and is defined as follows:
+
+```haskell
+data Maybe a = Nothing | Just a
+```
+
+We see above that Maybe has two constructors: `Nothing` and `Just a`. This indicates that `Maybe a` will either be a value of type `a` or `Nothing`. Here is an example of how it might be used:
+
+```haskell
+import Text.Read (readMaybe)
+
+foo :: String -> String -> String -> Maybe Int
+foo x y z = case readMaybe x of         -- Try to read x from a string to an Int
+    Nothing -> Nothing                  -- Return Nothing if k :: Int cannot be derived from x
+    Just k -> case readMaybe y of       -- Otherwise try to read y from a string to an Int
+        Nothing -> Nothing              -- Return Nothing if l :: Int cannot be derived from y
+        Just l -> case readMaybe z of   -- Otherwise try to read z from a string to an Int
+            Nothing -> Nothing          -- Return Nothing if m :: Int cannot be derived from z
+            Just m -> Just (k + l + m)  -- Otherwise return the sum of k, l, and m as Int
+```
+
+The above function accepts three strings, tries to read each as an Int, and then return their sum as an Int.
+
+Because not all string can be read as an Int, we use Maybe as a form of exception handling to immediately return Nothing in case of failure. In other words, if any of the three supplied strings cannot be read as an Int, our function returns Nothing. We can re-factor this function to be more compact:
+
+```haskell
+bindMaybe :: Maybe a -> (a -> Maybe b) -> Maybe b
+bindMaybe Nothing _  = Nothing
+bindMaybe (Just x) f = f x
+
+foo' :: String -> String -> String -> Maybe Int
+foo' x y z = readMaybe x `bindMaybe` \k ->
+             readMaybe y `bindMaybe` \l ->
+             readMaybe z `bindMaybe` \m ->
+             Just (k + l + m)
+```
+
+In this case, we extract our exception handling logic into a common function called `bindMaybe`, that accepts an `a` or `Nothing`, and a function that accepts the `a` and produces a `b` or `Nothing`.
+
+If the first argument is Nothing, then `bindMaybe` returns `Nothing`. Otherwise, it returns the result of passing the `a` to the function that accepts an `a` and produces a `b` or `Nothing`.
+
+As such, we can use `bindMaybe` to chain each string argument in `foo'` together, returning `Nothing` upon hitting an unreadable string, and returning their sum otherwise.
