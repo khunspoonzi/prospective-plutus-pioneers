@@ -101,13 +101,13 @@ return "Haskell" :: IO String
 
 ## Type: [Maybe](https://youtu.be/g4lvA14I-Jg?t=1730)
 
-The Maybe type is one of Haskell's most useful types and is defined as follows:
+The `Maybe` type is one of Haskell's most useful types and is defined as follows:
 
 ```haskell
 data Maybe a = Nothing | Just a
 ```
 
-We see above that Maybe has two constructors: `Nothing` and `Just a`. This indicates that `Maybe a` will either be a value of type `a` or `Nothing`. Here is an example of how it might be used:
+We see above that `Maybe` has two constructors: `Nothing` and `Just a`. This indicates that `Maybe a` will either be a value of type `a` or `Nothing`. Here is an example of how it might be used:
 
 ```haskell
 import Text.Read (readMaybe)
@@ -143,3 +143,42 @@ In this case, we extract our exception handling logic into a common function cal
 If the first argument is Nothing, then `bindMaybe` returns `Nothing`. Otherwise, it returns the result of passing the `a` to the function that accepts an `a` and produces a `b` or `Nothing`.
 
 As such, we can use `bindMaybe` to chain each string argument in `foo'` together, returning `Nothing` upon hitting an unreadable string, and returning their sum otherwise.
+
+## Type: [Either](https://youtu.be/g4lvA14I-Jg?t=2394)
+
+The `Either` type also has two constructors, except that another variable type is used instead of `Nothing`:
+
+```haskell
+data Either a b = Left a | Right b
+```
+
+Within the context of error- and exception-handling, it might be helpful to think of the `Right` constructor as corresponding to `Maybe`'s `Just`, and the `Left` constructor as corresponding to a more helpful value than `Nothing` such as a `String` error message or an `Int` error code.
+
+Here is an example of how `Either` might be used:
+
+```haskell
+import Test.Read (readMaybe)
+
+readEither :: Read a => String -> Either String a
+readEither s = case readMaybe s of
+    Nothing -> Left $ "Unable to parse: " ++ s
+    Just a  -> Right a
+```
+
+We could re-write our `foo'` function to produce error messages as follows:
+
+```haskell
+import Test.Read (readMaybe)
+
+bindEither :: Either String a -> (a -> Either String b) -> Either String b
+bindEither (Left err) _ = Left err
+bindEither (Right x) f  = f x
+
+foo'' :: String -> String -> String -> Either String Int
+foo'' x y z = readEither x `bindEither` \k ->
+             readEither y `bindEither` \l ->
+             readEither z `bindEither` \m ->
+             Right (k + l + m)
+```
+
+### More notes soon...
