@@ -99,7 +99,7 @@ The return function is useful for converting a general value into a monad, for i
 return "Haskell" :: IO String
 ```
 
-## Type: [Maybe](https://youtu.be/g4lvA14I-Jg?t=1730)
+## Monad: [Maybe](https://youtu.be/g4lvA14I-Jg?t=1730)
 
 The `Maybe` type is one of Haskell's most useful types and is defined as follows:
 
@@ -144,7 +144,7 @@ If the first argument is Nothing, then `bindMaybe` returns `Nothing`. Otherwise,
 
 As such, we can use `bindMaybe` to chain each string argument in `foo'` together, returning `Nothing` upon hitting an unreadable string, and returning their sum otherwise.
 
-## Type: [Either](https://youtu.be/g4lvA14I-Jg?t=2394)
+## Monad: [Either](https://youtu.be/g4lvA14I-Jg?t=2394)
 
 The `Either` type also has two constructors, except that another variable type is used instead of `Nothing`:
 
@@ -176,9 +176,96 @@ bindEither (Right x) f  = f x
 
 foo'' :: String -> String -> String -> Either String Int
 foo'' x y z = readEither x `bindEither` \k ->
-             readEither y `bindEither` \l ->
-             readEither z `bindEither` \m ->
-             Right (k + l + m)
+              readEither y `bindEither` \l ->
+              readEither z `bindEither` \m ->
+              Right (k + l + m)
 ```
+
+## [Writing a Writer](https://youtu.be/g4lvA14I-Jg?t=2874)
+
+Thus far, we've looked at how we can use monads to represent computations that involve side effects as well as to handle computations that can fail.
+
+We can further extend what we've learned about monads to represent computations that produce log output.
+
+### Type: [Writer](https://youtu.be/g4lvA14I-Jg?t=2918)
+
+First, we can define a custom type called `Writer`:
+
+```haskell
+data Writer a = Writer a [String]
+    deriving Show
+```
+
+In this case, `Writer` takes two arguments: a result `a` and a list of log messages, and can be used to define, for example, a function that accepts an `Int` and produces a `Writer Int`:
+
+```haskell
+number :: Int -> Writer Int
+number n = Writer n $ ["number: " ++ show n]
+```
+
+As before, we define a function `foo` that will in this case produce the "sum" of three `Writer Int` values:
+
+```haskell
+foo :: Writer Int -> Writer Int -> Writer Int -> Writer Int
+foo (Writer k xs) (Writer l ys) (Writer m zs) =
+    Writer (k + l + m) $ xs ++ ys ++ zs
+```
+
+The result of `foo` might look something like this:
+
+```
+Prelude > foo (number 1) (number 2) (number 3)
+
+>> Writer 6 ["number: 1", "number: 2", "number: 3"]
+```
+
+We can go ahead and add the sum itself to our list of log messages:
+
+```haskell
+tell :: [String] -> Writer ()
+tell = Writer ()
+
+foo' :: Writer Int -> Writer Int -> Writer Int -> Writer Int
+foo' (Writer k xs) (Writer l ys) (Writer m zs) =
+    let
+      s = k + l + m
+      Writer _ us = tell ["sum: " ++ show s]
+    in
+      Writer s $ xs ++ ys ++ zs ++ us
+```
+
+The above `foo'` would give rise to:
+
+```
+Prelude > foo' (number 1) (number 2) (number 3)
+
+>> Writer 6 ["number: 1", "number: 2", "number: 3", "sum: 6"]
+```
+
+Once more, we can abstract away some of the logic into a separate bind function to make things more robust:
+
+```haskell
+bindWriter :: Writer a -> (a -> Writer b) -> Writer b
+bindWriter (Writer a xs) f =
+  let
+    Writer b ys = f a
+  in
+    Writer b $ xs ++ ys
+
+foo'' :: Writer Int -> Writer Int -> Writer Int -> Writer Int
+foo'' x y z = x `bindWriter` \k ->
+              y `bindWriter` \l ->
+              z `bindWriter` \m ->
+              let s = k + l + m
+              in tell ["sum: " ++ show s] `bindWriter` \_ ->
+                 Writer s []
+```
+
+While not necessarily shorter than `foo'`, `foo''` can be considered more robust in the sense that:
+
+- We no longer need to perform pattern matching on each of the three `Writer Int` arguments
+- We no longer need to explicity combine their log messages, reducing potential for mistakes
+
+In contrast to the `Maybe` and `Either` examples which demonstrate how to chain computations that account for failure, our `Writer` example demonstrates how to chain computations that produce log outputs.
 
 ### More notes soon...
