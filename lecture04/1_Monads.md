@@ -12,11 +12,13 @@ What this means is, given the same arguments, a Haskell function can be expected
 
 This can be contrasted with impure languages in which function results may (or may not) depend on variable mutations, state changes, or external inputs.
 
-On one hand, referential transparency is one of the key features that makes Haskell relatively safe, predictable, and easy to test. On the other hand, a complete exclusion of side-effects would make any programming language practically useless for any real-world application, such as those that deal with external input and output.
+On one hand, referential transparency is one of the key features that makes Haskell relatively safe, predictable, and easy to test. On the other hand, a completely pure programming language devoid of side-effects would be practically useless for most real-world applications.
+
+As such, Monads in Haskell bridge this gap by allowing us to create a kind of container in which computations with side-effects can occur. We'll look at a few examples of how that works now.
 
 ## Monad: [IO](https://youtu.be/g4lvA14I-Jg?t=660)
 
-Haskell's IO monad provides one of the most common methods of dealing with an impure computation.
+Haskell's IO monad provides a means of dealing with one of the most common forms of impure computation: input and output.
 
 The IO monad -- a built-in primitive -- is a type constructor that takes one argument that represents the expected return type and is used as follows:
 
@@ -100,6 +102,12 @@ return "Haskell" :: IO String
 ```
 
 ## Monad: [Maybe](https://youtu.be/g4lvA14I-Jg?t=1730)
+
+Monads [give you superpowers like] "the superpower to be able to fail."
+
+-- Lars Brünjes on Maybe
+
+---
 
 The `Maybe` type is one of Haskell's most useful types and is defined as follows:
 
@@ -267,5 +275,30 @@ While not necessarily shorter than `foo'`, `foo''` can be considered more robust
 - We no longer need to explicity combine their log messages, reducing potential for mistakes
 
 In contrast to the `Maybe` and `Either` examples which demonstrate how to chain computations that account for failure, our `Writer` example demonstrates how to chain computations that produce log outputs.
+
+## [The Anatomy of a Monad](https://youtu.be/g4lvA14I-Jg?t=3552)
+
+At this point, we're in a good position to define what monads are based on what they're made of and what they do.
+
+For instance, we probably noticed that each of the examples above featured a type constructor with one type parameter:
+
+- `IO a`
+- `Maybe a`
+- `Either String a`
+- `Writer a`
+
+In each case, we made use of a bind function of the same shape to chain their computations together in sequence:
+
+- `IO`: `(>>=)`
+- `Maybe`: `bindMaybe`
+- `Either`: `bindEither`
+- `Writer`: `bindWriter`
+
+Furthermore, we've seen how monads also allow for the possibility for computations that do not produce side effects:
+
+- `IO`: `return`
+- `Maybe`: `Just`
+- `Either`: `Right`
+- `Writer`: `(\a -> Writer a [])`
 
 ### More notes soon...
