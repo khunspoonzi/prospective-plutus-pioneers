@@ -346,4 +346,65 @@ instance Monad Writer where
     (>>=) = bindWriter
 ```
 
+## Function: [threeInts](https://youtu.be/g4lvA14I-Jg?t=4288)
+
+Using and defining monads can often be advantageous since having a set of common methods allows us to define common functions that work for all monads, regardless of their respective implementations.
+
+```haskell
+threeInts :: Monad m => m Int -> m Int -> m Int -> m Int
+threeInts mx my mz =
+    mx >>= \k ->
+    my >>= \l ->
+    mz >>= \m ->
+    let s = k + l + m in return s
+```
+
+### Example: [Maybe](https://youtu.be/g4lvA14I-Jg?t=4376)
+
+```haskell
+-- Original Implementation
+foo :: String -> String -> String -> Maybe Int
+foo x y z = readMaybe x `bindMaybe` \k ->
+            readMaybe y `bindMaybe` \l ->
+            readMaybe z `bindMaybe` \m ->
+            Just (k + l + m)
+
+-- Monadic Implementation
+foo' :: String -> String -> String -> Maybe Int
+foo' x y z = threeInts (readMaybe x) (readMaybe y) (readMaybe z)
+```
+
+### Example: [Either](https://youtu.be/g4lvA14I-Jg?t=4462)
+
+```haskell
+-- Original Implementation
+foo :: String -> String -> String -> Either String Int
+foo x y z = readEither x `bindEither` \k ->
+            readEither y `bindEither` \l ->
+            readEither z `bindEither` \m ->
+            Right (k + l + m)
+
+-- Monadic Implementation
+foo' :: String -> String -> String -> Either String Int
+foo' x y z = threeInts (readEither x) (readEither y) (readEither z)
+```
+
+### Example: [Writer](https://youtu.be/g4lvA14I-Jg?t=4520)
+
+```haskell
+-- Original Implementation
+foo :: Writer Int -> Writer Int -> Writer Int -> Writer Int
+foo x y z = x `bindWriter` \k ->
+            y `bindWriter` \l ->
+            z `bindWriter` \m ->
+            let s = k + l + m
+            in tell ["sum: " ++ show s] `bindWriter` \_ ->
+              Writer s []
+
+-- Monadic Implementation
+foo' :: Writer Int -> Writer Int -> Writer Int -> Writer Int
+foo' x y z = threeInts x y z          >>= \s ->
+             tell ["sum: " ++ show s] >>
+             return s
+```
 ### More notes soon...
