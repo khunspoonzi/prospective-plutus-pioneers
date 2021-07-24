@@ -44,7 +44,7 @@ Since no amount of built-ins would be enough to to acommodate a potentially infi
 
 ### Function: [fmap](https://youtu.be/g4lvA14I-Jg?t=1100)
 
-Monads like IO have a Functor instance which has a useful method called fmap:
+Monads like IO have a `Functor` instance which has a useful method called fmap:
 
 ```haskell
 fmap :: (a -> b) -> f a -> f b
@@ -300,5 +300,50 @@ Furthermore, we've seen how monads also allow for the possibility for computatio
 - `Maybe`: `Just`
 - `Either`: `Right`
 - `Writer`: `(\a -> Writer a [])`
+
+More concisely, we see that a Monad is described as follows:
+
+```haskell
+class Applicative m => Monad (m :: * -> *) where
+  (>>=) :: m a -> (a -> m b) -> m b
+  (>>) :: m a -> m b -> m b
+  return :: a -> m a
+```
+
+Correspondingly, its superclass `Applicative` is (partially) described as follows:
+
+```haskell
+class Functor f => Applicative (f :: * -> *) where
+  pure :: a -> f a
+  (<*>) :: f (a -> b) -> f a -> f b  -- Pronounced ap
+```
+
+And the superclass `Functor` is (partially) described as follows:
+
+```haskell
+class Functor (f :: * -> *) where
+  fmap :: (a -> b) -> f a -> f b
+```
+
+Note the `fmap` method we worked with earlier.
+
+## Monad: [Writer](https://youtu.be/g4lvA14I-Jg?t=4050)
+
+Given the above information, we could formally define our `Writer` type as a monad:
+
+```haskell
+import Control.Monad
+
+instance Functor Writer where
+    fmap = liftM
+
+instance Applicative Writer where
+    pure  = return
+    (<*>) = ap
+
+instance Monad Writer where
+    return a = Writer a []
+    (>>=) = bindWriter
+```
 
 ### More notes soon...
