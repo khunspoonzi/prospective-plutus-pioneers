@@ -407,4 +407,43 @@ foo' x y z = threeInts x y z          >>= \s ->
              tell ["sum: " ++ show s] >>
              return s
 ```
-### More notes soon...
+
+## [Do Notation](https://youtu.be/g4lvA14I-Jg?t=4924)
+
+Because binding monadic computations together with named results as above is so common, a special notation (syntactic sugar) known as "do notation" can be used to the same effect for added convenience. For isntance:
+
+```haskell
+-- Original Implementation
+threeInts :: Monad m => m Int -> m Int -> m Int -> m Int
+threeInts mx my mz =
+    mx >>= \k ->
+    my >>= \l ->
+    mz >>= \m ->
+    let s = k + l + m in return s
+
+-- Using Do Notation
+threeIntsi' :: Monad m => m Int -> m Int -> m Int -> m Int
+threeInts' mx my mz = do
+    k <- mx
+    l <- my
+    m <- mz
+    let s = k + l + m
+    return s
+```
+
+### Example: [Writer](https://youtu.be/g4lvA14I-Jg?t=5088)
+
+```haskell
+-- Monadic Implementation
+foo :: Writer Int -> Writer Int -> Writer Int -> Writer Int
+foo x y z = threeInts x y z          >>= \s ->
+             tell ["sum: " ++ show s] >>
+             return s
+
+-- Using Do Notation
+foo' :: Writer Int -> Writer Int -> Writer Int -> Writer Int
+foo' x y z = do
+    s <- threeInts x y z
+    tell ["sum: " ++ show s]
+    return s
+```
