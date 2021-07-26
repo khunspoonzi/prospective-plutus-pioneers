@@ -112,7 +112,8 @@ myTrace = do
     callEndpoint @"grab" h2 ()
 
     -- Step 5
-    void $ waitNSlots 1
+    s <- waitNSlots 1
+    Extras.logInfo $ "Reached " ++ show s
 ```
 
 ### Step 1
@@ -135,7 +136,7 @@ We call the `grab` endpoint on behalf of wallet 2 again using `callEndpoint`, bu
 
 ### Step 5
 
-We wait for 1 slot using `waitNSlots`, again using `void` to indicate we are uninterested in the return value.
+We wait for 1 slot using `waitNSlots`, this time binding the return value to `s` to use in a log message.
 
 We can then run the `EmulatorTrace` like so:
 
