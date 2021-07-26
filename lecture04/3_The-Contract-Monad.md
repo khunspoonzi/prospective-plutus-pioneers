@@ -52,3 +52,5 @@ myContract2 = do
     void $ Contract.throwError "BOOM!"
     Contract.logInfo @String "Script will never get here"
 ```
+
+### More Notes Soon...
