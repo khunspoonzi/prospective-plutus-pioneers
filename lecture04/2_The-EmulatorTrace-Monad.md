@@ -109,7 +109,7 @@ myTrace = do
     void $ waitUntilSlot 20
 
     -- Step 4
-    callEndpoint @grab h2 ()
+    callEndpoint @"grab" h2 ()
 
     -- Step 5
     void $ waitNSlots 1
