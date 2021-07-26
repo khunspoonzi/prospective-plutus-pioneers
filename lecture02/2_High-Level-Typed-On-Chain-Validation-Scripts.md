@@ -55,6 +55,15 @@ Specifically, the wrap function handles conversion of the datum, redeemer, and c
 1. **toData,** which converts a value of type a to Data
 2. **fromData,** which converts Data to a value of type Maybe a
 
+**Note:**: A new type `BuiltinData` has been introduced which will necessitate use of additional functions later:
+
+1. **toBuiltinData**
+2. **fromBuiltinData**
+3. **dataToBuiltinData**
+4. **builtinDataToData**
+
+The existings notes until lecture 4 will **not** be changed to reflect this update.
+
 ### Function: [validator](https://youtu.be/sN3BIa3GAOc?t=3858)
 
 Once mkValidator has been compiled into a typed validator, it needs to be converted into an untyped validator using Scripts.validatorScript:
