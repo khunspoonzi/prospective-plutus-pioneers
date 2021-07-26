@@ -144,5 +144,3 @@ We can then run the `EmulatorTrace` like so:
 test :: IO ()
 test = runEmulatorTraceIO myTrace
 ```
-
-### More Notes Soon...
