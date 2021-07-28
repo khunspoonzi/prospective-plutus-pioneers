@@ -68,7 +68,7 @@ payTrace amt1 amt2 = do
   -- Get wallet 2 public key hash
   let w2 = pubKeyHash $ walletPubKey $ Wallet 2
 
-  -- Define pay amount helper function
+  -- Define pay wallet 2 helper function
   let payWallet2 = \amt -> do
         callEndpoint @"pay" h1
           $ PayParams { ppRecipient = w2, ppLovelace = amt }
