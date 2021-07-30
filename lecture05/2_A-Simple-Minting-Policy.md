@@ -26,7 +26,7 @@ More specifically, `TxInfoForge` will now contain a bag of `AssetClass` elements
 
 Unlike validation scripts which accept a datum, redeemer, and context, minting policy scripts only accept a context and a redeemer provided by the transaction.
 
-## [Writing a Minting Policy](https://youtu.be/SsaVjSsPPcg?t=1220)
+## [On-chain Script](https://youtu.be/SsaVjSsPPcg?t=1220)
 
 Similar to `mkValidator` in previous sections, we begin writing a minting policy by defining a function called `mkPolicy`.
 
@@ -54,8 +54,6 @@ policy = mkMintingPolicyScript $$(PlutusTx.compile [|| Scripts.wrapMintingPolicy
 
 As before, we use template Haskell , where `mkPolicy` is wrapped so that it can be converted into its untyped form.
 
-## [Transforming a Minting Policy](https://youtu.be/SsaVjSsPPcg?t=1396)
-
 ### Function: [curSymbol](https://youtu.be/SsaVjSsPPcg?t=1396)
 
 A minting policy can be transformed into a `CurrencySymbol` hash using the `scriptCurrencySymbol` utility:
@@ -63,4 +61,55 @@ A minting policy can be transformed into a `CurrencySymbol` hash using the `scri
 ```haskell
 curSymbol :: CurrencySymbol
 curSymbol = scriptCurrencySymbol policy
+```
+
+## [Off-chain Script](https://youtu.be/SsaVjSsPPcg?t=1456)
+
+We can test the above minting policy using the following off-chain script:
+
+```haskell
+data MintParams = MintParams
+    { mpTokenName :: !TokenName  -- e.g. ABC (CurrencySymbol already given by script)
+    , mpAmount    :: !Integer    -- Positive to mint and negative to burn
+    } deriving (Generic, ToJSON, FromJSON, ToSchema)
+
+type FreeSchema = Endpoint "mint" MintParams
+
+mint :: MintParams -> Contract w FreeSchema Text ()
+mint mp = do
+    let val     = Value.singleton curSymbol (mpTokenName mp) (mpAmount mp)  -- Value to mint / burn
+        lookups = Constraints.mintingPolicy policy  -- Transaction must contain the policy itself to be successful
+        tx      = Constraints.mustMintValue val  -- Transaction must mint the computed value
+    ledgerTx <- submitTxConstraintsWith @Void lookups tx  -- Handles fees, adds or removes minted / burned values to / from wallet
+    void $ awaitTxConfirmed $ txId ledgerTx
+    Contract.logInfo @String $ printf "forged %s" (show val)
+
+endpoints :: Contract () FreeSchema Text ()
+endpoints = mint' >> endpoints
+  where
+    mint' = endpoint @"mint" >>= mint
+
+mkSchemaDefinitions ''FreeSchema
+
+mkKnownCurrencies []
+
+test :: IO ()
+test = runEmulatorTraceIO $ do
+    let tn = "ABC"
+    h1 <- activateContractWallet (Wallet 1) endpoints
+    h2 <- activateContractWallet (Wallet 2) endpoints
+    callEndpoint @"mint" h1 $ MintParams
+        { mpTokenName = tn
+        , mpAmount    = 555
+        }
+    callEndpoint @"mint" h2 $ MintParams
+        { mpTokenName = tn
+        , mpAmount    = 444
+        }
+    void $ Emulator.waitNSlots 1
+    callEndpoint @"mint" h1 $ MintParams
+        { mpTokenName = tn
+        , mpAmount    = -222
+        }
+    void $ Emulator.waitNSlots 1
 ```
