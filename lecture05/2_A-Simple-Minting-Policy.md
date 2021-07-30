@@ -26,4 +26,41 @@ More specifically, `TxInfoForge` will now contain a bag of `AssetClass` elements
 
 Unlike validation scripts which accept a datum, redeemer, and context, minting policy scripts only accept a context and a redeemer provided by the transaction.
 
-### More Notes Soon...
+## [Writing a Minting Policy](https://youtu.be/SsaVjSsPPcg?t=1220)
+
+Similar to `mkValidator` in previous sections, we begin writing a minting policy by defining a function called `mkPolicy`.
+
+### Function: [mkPolicy](https://youtu.be/SsaVjSsPPcg)
+
+Unlike validators, minting policies only accept a redeemer and context.
+```haskell
+{-# INLINABLE mkPolicy #-}
+mkPolicy :: () -> ScriptContext -> Bool
+mkPolicy () _ = True
+```
+
+The above example represents one of the simplest minting policies we can write, returning `True` unconditionally. This in turn would allow unrestricted minting and burning for the `CurrencySymbol` associated with this policy.
+
+Note that the `Bool` return value suggests that we are looking at the higher-level typed version of `mkPolicy`.
+
+### Function: [policy](https://youtu.be/SsaVjSsPPcg?t=1328)
+
+Once `mkPolicy` has been defined, it can then be compiled into Plutus script using `mkMintingPolicyScript`:
+
+```haskell
+policy :: Scripts.MintingPolicy
+policy = mkMintingPolicyScript $$(PlutusTx.compile [|| Scripts.wrapMintingPolicy mkPolicy ||])
+```
+
+As before, we use template Haskell , where `mkPolicy` is wrapped so that it can be converted into its untyped form.
+
+## [Transforming a Minting Policy](https://youtu.be/SsaVjSsPPcg?t=1396)
+
+### Function: [curSymbol](https://youtu.be/SsaVjSsPPcg?t=1396)
+
+A minting policy can be transformed into a `CurrencySymbol` hash using the `scriptCurrencySymbol` utility:
+
+```haskell
+curSymbol :: CurrencySymbol
+curSymbol = scriptCurrencySymbol policy
+```
