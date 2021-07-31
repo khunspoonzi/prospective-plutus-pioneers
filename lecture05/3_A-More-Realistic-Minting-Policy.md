@@ -23,7 +23,7 @@ We will need to account for the new parameter when compiling our policy to Plutu
 ```haskell
 policy :: PubKeyHash -> Scripts.MintingPolicy
 policy pkh = mkMintingPolicyScript $
-    $$(PlutusTx.compile [|| Scripts.wrapMintingPolicy mkPolicy ||])
+    $$(PlutusTx.compile [|| Scripts.wrapMintingPolicy . mkPolicy ||])
     `PlutusTx.applyCode`
     (PlutusTx.liftCode pkh)
 ```
