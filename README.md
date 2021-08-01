@@ -21,6 +21,14 @@ Watch a Haskell course on YouTube
 
 - https://youtube.com/playlist?list=PLe7Ei6viL6jGp1Rfu0dil1JH1SHk9bgDV
 
+Enroll in a free Haskell course by the University of Glasgow (where the GHC came from)
+
+- https://www.futurelearn.com/courses/functional-programming-haskell
+
+Watch IOHK's Mongolia course on Haskell and cryptocurrency
+
+- https://youtube.com/playlist?list=PLJ3w5xyG4JWmBVIigNBytJhvSSfZZzfTm
+
 ## Discord
 
 Join our Discord server
