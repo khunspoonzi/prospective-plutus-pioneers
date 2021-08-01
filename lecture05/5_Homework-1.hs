@@ -64,7 +64,7 @@ import           Wallet.Emulator.Wallet
 mkPolicy :: PubKeyHash -> POSIXTime -> () -> ScriptContext -> Bool
 mkPolicy pkh deadline () ctx =
   traceIfFalse "Signature missing" isSigned
-    && traceIfFalse "Deadline passed.." deadlineNotPassed
+    && traceIfFalse "Deadline passed" deadlineNotPassed
  where
 
     -- Get transaction info
