@@ -59,8 +59,6 @@ import           Wallet.Emulator.Wallet
 ----------------------------------------------------------------------------------------
 
 {-# INLINABLE mkPolicy #-}
--- This policy should only allow minting (or burning) of tokens if the owner of the specified PubKeyHash
--- has signed the transaction and if the specified deadline has not passed.
 mkPolicy :: PubKeyHash -> POSIXTime -> () -> ScriptContext -> Bool
 mkPolicy pkh deadline () ctx =
   traceIfFalse "Signature missing" isSigned
