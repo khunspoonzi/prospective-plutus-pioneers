@@ -113,7 +113,7 @@ type NFTSchema = Endpoint "mint" TokenName
 mint :: TokenName -> Contract w NFTSchema Text ()
 mint tn = do
     pk    <- Contract.ownPubKey
-    utxos <- utxoAt (pubKeyAddress pk)
+    utxos <- utxoAt (pubKeyAddress pk)  -- Get list of all UTxOs at our wallet
     case Map.keys utxos of
         []       -> Contract.logError @String "no utxo found"
         oref : _ -> do
