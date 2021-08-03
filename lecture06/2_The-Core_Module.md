@@ -219,17 +219,36 @@ The `updateOracle` helps us deal with two cases:
 ```haskell
 updateOracle :: forall w s. Oracle -> Integer -> Contract w s Text ()
 updateOracle oracle x = do
-    m <- findOracle oracle  -- Looks up an existing oracle UTxO if exists
+    -- Looks up an existing oracle UTxO if exists
+    m <- findOracle oracle
+
+    -- Get constraints
+    -- Transaction must have an output that pays to a script address
+    -- With datum of x, and the NFT value
     let c = Constraints.mustPayToTheScript x $ assetClassValue (oracleAsset oracle) 1
     case m of
+
+        -- Case of no UTxO (oracle just started)
         Nothing -> do
+
+            -- Create a transaction with constraints defined above
             ledgerTx <- submitTxConstraints (typedOracleValidator oracle) c
+
+            -- Wait for confirmation and log info
             awaitTxConfirmed $ txId ledgerTx
             logInfo @String $ "set initial oracle value to " ++ show x
+
+        -- Case of existing oracle UTxO
+        -- We don't care about datum because we update it here
         Just (oref, o,  _) -> do
+
+            -- Provide lookup to find output to spend
+            -- Provide script instances for the input side and for the output side
             let lookups = Constraints.unspentOutputs (Map.singleton oref o)     <>
                           Constraints.typedValidatorLookups (typedOracleValidator oracle) <>
                           Constraints.otherScript (oracleValidator oracle)
+
+                -- Add constraint that must consume the existing UTxO
                 tx      = c <> Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData Update)
             ledgerTx <- submitTxConstraintsWith @Oracling lookups tx
             awaitTxConfirmed $ txId ledgerTx
@@ -265,4 +284,40 @@ findOracle oracle = do
     f o = assetClassValueOf (txOutValue $ txOutTxOut o) (oracleAsset oracle) == 1
 ```
 
-### More Notes Soon...
+Note that fees are collected automatically due the balancing algorithm, i.e. whatever is specified in the input but not in the output will be sent to our own wallet, in this case the fees.
+
+### Function: [runOracle](https://youtu.be/24SHPHEc3zo?t=3332)
+
+The `runOracle` function combines the `startOracle` and `updateOracle` functions into one contract:
+
+ ```haskell
+type OracleSchema = Endpoint "update" Integer
+
+runOracle :: OracleParams -> Contract (Last Oracle) OracleSchema Text ()
+runOracle op = do
+    -- Start the oracle (mint NFT)
+    oracle <- startOracle op
+
+    -- Write the oracle value to the outside world so that others can use the oracle
+    tell $ Last $ Just oracle
+
+    -- Call go helper function
+    go oracle
+  where
+
+    -- Loops forever and blocks at update endpoint and waits for a new Integer value
+    go :: Oracle -> Contract (Last Oracle) OracleSchema Text a
+    go oracle = do
+        x <- endpoint @"update"
+        updateOracle oracle x
+        go oracle
+ ```
+
+In the example above, `Last` is defined as follows:
+
+ ```haskell
+type Last :: * -> *
+newtype Last a = Last {getLast :: Maybe a}
+ ```
+
+As such, `Last` will take that last `Just` value in a monoid, i.e. last value that isn't `Nothing`.
