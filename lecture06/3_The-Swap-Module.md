@@ -109,4 +109,110 @@ mkSwapValidator oracle addr pkh () ctx =
 
 We do not have to check that the NFT is present because this happens in the core module.
 
+### Type: [Swapping](https://youtu.be/24SHPHEc3zo?t=4414)
+
+The `Swapping` helper type serves to combine the datum and redeemer:
+
+```haskell
+data Swapping
+instance Scripts.ValidatorTypes Swapping where
+    type instance DatumType Swapping = PubKeyHash
+    type instance RedeemerType Swapping = ()
+```
+
+### Function: [typedSwapValidator](https://youtu.be/24SHPHEc3zo?t=4430)
+
+The `typedSwapValidator` function compiles our validator into a typed validator with parameters:
+
+```haskell
+typedSwapValidator :: Oracle -> Scripts.TypedValidator Swapping
+typedSwapValidator oracle = Scripts.mkTypedValidator @Swapping
+    ($$(PlutusTx.compile [|| mkSwapValidator ||])
+        `PlutusTx.applyCode` PlutusTx.liftCode oracle
+        `PlutusTx.applyCode` PlutusTx.liftCode (oracleAddress oracle))
+    $$(PlutusTx.compile [|| wrap ||])
+  where
+    wrap = Scripts.wrapValidator @PubKeyHash @()
+```
+
+In this case, we actually compute the oracle address from the oracle.
+
+### Function: [swapValidator](https://youtu.be/24SHPHEc3zo?t=4470)
+
+The `swapValidator` function converts our typed validator into a Validator:
+
+```haskell
+swapValidator :: Oracle -> Validator
+swapValidator = Scripts.validatorScript . typedSwapValidator
+```
+
+### Function: [swapAddress](https://youtu.be/24SHPHEc3zo?t=4470)
+
+The `swapAddress` function converts our validator into a Ledger.Address:
+
+```haskell
+swapAddress :: Oracle -> Ledger.Address
+swapAddress = scriptAddress . swapValidator
+```
+
+### Function: [offerSwap](https://youtu.be/24SHPHEc3zo?t=4484)
+
+The `offerSwap` function allows a seller to offer a swap for his ADA:
+
+```haskell
+offerSwap :: forall w s. Oracle -> Integer -> Contract w s Text ()
+offerSwap oracle amt = do
+    -- Look up seller's public key
+    pkh <- pubKeyHash <$> Contract.ownPubKey
+
+    -- Define a constraint that an amount of ADA must be paid to the script for the swap
+    let tx = Constraints.mustPayToTheScript pkh $ Ada.lovelaceValueOf amt
+
+    -- Submit transaction, wait for confirmation, and log info
+    ledgerTx <- submitTxConstraints (typedSwapValidator oracle) tx
+    awaitTxConfirmed $ txId ledgerTx
+    logInfo @String $ "offered " ++ show amt ++ " lovelace for swap"
+```
+
+### Function: [findSwaps](https://youtu.be/24SHPHEc3zo?t=4542)
+
+The `findSwaps` function finds all swaps that satisfy a specific predicate:
+
+```haskell
+findSwaps :: Oracle -> (PubKeyHash -> Bool) -> Contract w s Text [(TxOutRef, TxOutTx, PubKeyHash)]
+findSwaps oracle p = do
+    -- Get all UTxOs sitting at swap address
+    utxos <- utxoAt $ swapAddress oracle
+
+    -- Return the result of map maybe where all elements are Just x
+    return $ mapMaybe g $ Map.toList utxos
+  where
+    f :: TxOutTx -> Maybe PubKeyHash
+    f o = do
+
+        -- Get datum hash attached to output
+        dh        <- txOutDatumHash $ txOutTxOut o
+
+        -- Get datum
+        (Datum d) <- Map.lookup dh $ txData $ txOutTxTx o
+
+        -- Deserialize datum to pubkeyhash
+        PlutusTx.fromBuiltinData d
+
+    g :: (TxOutRef, TxOutTx) -> Maybe (TxOutRef, TxOutTx, PubKeyHash)
+    g (oref, o) = do
+
+        -- Get public key hash from datum
+        pkh <- f o
+
+        -- Apply guard, which fails (returns Nothing) if a boolean is False and drops this UTxO
+        guard $ p pkh
+
+        -- Return the triple otherwise
+        return (oref, o, pkh)
+```
+
+The `offerSwap` function allows a seller to offer a swap for his ADA:
+
+
 ### More Notes Soon...
