@@ -82,4 +82,96 @@ Note that we don't need to provide the choice itself because we know that player
 
 `ClaimSecond` is used in the case that player one does not `Reveal` they have won because they know they have lost, allowing player two to collect their winnings.
 
+### Function: [lovelaces](https://youtu.be/uwZ903Zd0DU?t=830)
+
+The `lovelaces` helper function extracts the `Integer` amount of lovelaces contained in a `Value`:
+
+```haskell
+{-# INLINABLE lovelaces #-}
+lovelaces :: Value -> Integer
+lovelaces = Ada.getLovelace . Ada.fromValue
+```
+
+### Function: [gameDatum](https://youtu.be/uwZ903Zd0DU?t=842)
+
+The `gameDatum` function returns a `Maybe GameDatum` given an output of a transaction:
+
+```haskell
+{-# INLINABLE gameDatum #-}
+gameDatum :: TxOut -> (DatumHash -> Maybe Datum) -> Maybe GameDatum
+gameDatum o f = do
+    dh      <- txOutDatum o     -- Get datum hash from output
+    Datum d <- f dh             -- Convert hash into a Datum value
+    PlutusTx.fromBuiltinData d  -- Convert Datum to GameDatum
+```
+
+### Function: [mkGameValidator](https://youtu.be/uwZ903Zd0DU?t=892)
+
+The `mkGameValidator` function defines the core business logic of the contract:
+
+```haskell
+{-# INLINABLE mkGameValidator #-}
+mkGameValidator :: Game -> ByteString -> ByteString -> GameDatum -> GameRedeemer -> ScriptContext -> Bool
+mkGameValidator game bsZero' bsOne' dat red ctx =
+    traceIfFalse "token missing from input" (assetClassValueOf (txOutValue ownInput) (gToken game) == 1) &&
+    case (dat, red) of
+        (GameDatum bs Nothing, Play c) ->
+            traceIfFalse "not signed by second player"   (txSignedBy info (gSecond game))                                   &&
+            traceIfFalse "first player's stake missing"  (lovelaces (txOutValue ownInput) == gStake game)                   &&
+            traceIfFalse "second player's stake missing" (lovelaces (txOutValue ownOutput) == (2 * gStake game))            &&
+            traceIfFalse "wrong output datum"            (outputDatum == GameDatum bs (Just c))                             &&
+            traceIfFalse "missed deadline"               (to (gPlayDeadline game) `contains` txInfoValidRange info)         &&
+            traceIfFalse "token missing from output"     (assetClassValueOf (txOutValue ownOutput) (gToken game) == 1)
+
+        (GameDatum bs (Just c), Reveal nonce) ->
+            traceIfFalse "not signed by first player"    (txSignedBy info (gFirst game))                                    &&
+            traceIfFalse "commit mismatch"               (checkNonce bs nonce c)                                            &&
+            traceIfFalse "missed deadline"               (to (gRevealDeadline game) `contains` txInfoValidRange info)       &&
+            traceIfFalse "wrong stake"                   (lovelaces (txOutValue ownInput) == (2 * gStake game))             &&
+            traceIfFalse "NFT must go to first player"   nftToFirst
+
+        (GameDatum _ Nothing, ClaimFirst) ->
+            traceIfFalse "not signed by first player"    (txSignedBy info (gFirst game))                                    &&
+            traceIfFalse "too early"                     (from (1 + gPlayDeadline game) `contains` txInfoValidRange info)   &&
+            traceIfFalse "first player's stake missing"  (lovelaces (txOutValue ownInput) == gStake game)                   &&
+            traceIfFalse "NFT must go to first player"   nftToFirst
+
+        (GameDatum _ (Just _), ClaimSecond) ->
+            traceIfFalse "not signed by second player"   (txSignedBy info (gSecond game))                                   &&
+            traceIfFalse "too early"                     (from (1 + gRevealDeadline game) `contains` txInfoValidRange info) &&
+            traceIfFalse "wrong stake"                   (lovelaces (txOutValue ownInput) == (2 * gStake game))             &&
+            traceIfFalse "NFT must go to first player"   nftToFirst
+
+        _                              -> False
+  where
+    info :: TxInfo
+    info = scriptContextTxInfo ctx
+
+    ownInput :: TxOut
+    ownInput = case findOwnInput ctx of
+        Nothing -> traceError "game input missing"
+        Just i  -> txInInfoResolved i
+
+    ownOutput :: TxOut
+    ownOutput = case getContinuingOutputs ctx of
+        [o] -> o
+        _   -> traceError "expected exactly one game output"
+
+    outputDatum :: GameDatum
+    outputDatum = case gameDatum ownOutput (`findDatum` info) of
+        Nothing -> traceError "game output datum not found"
+        Just d  -> d
+
+    checkNonce :: ByteString -> ByteString -> GameChoice -> Bool
+    checkNonce bs nonce cSecond = sha2_256 (nonce `concatenate` cFirst) == bs
+      where
+        cFirst :: ByteString
+        cFirst = case cSecond of
+            Zero -> bsZero'
+            One  -> bsOne'
+
+    nftToFirst :: Bool
+    nftToFirst = assetClassValueOf (valuePaidTo info $ gFirst game) (gToken game) == 1
+```
+
 ### More Notes Soon...
