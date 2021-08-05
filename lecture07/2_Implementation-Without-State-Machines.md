@@ -113,55 +113,87 @@ The `mkGameValidator` function defines the core business logic of the contract:
 {-# INLINABLE mkGameValidator #-}
 mkGameValidator :: Game -> ByteString -> ByteString -> GameDatum -> GameRedeemer -> ScriptContext -> Bool
 mkGameValidator game bsZero' bsOne' dat red ctx =
+    -- Check that input being validated contains NFT state token
     traceIfFalse "token missing from input" (assetClassValueOf (txOutValue ownInput) (gToken game) == 1) &&
     case (dat, red) of
+        -- When second player is moving
+        -- GameChoice is Nothing, and is playing choice c
         (GameDatum bs Nothing, Play c) ->
+            -- Player two signs transaction
             traceIfFalse "not signed by second player"   (txSignedBy info (gSecond game))                                   &&
+            -- Player one has stake
             traceIfFalse "first player's stake missing"  (lovelaces (txOutValue ownInput) == gStake game)                   &&
+            -- Second player has stake
             traceIfFalse "second player's stake missing" (lovelaces (txOutValue ownOutput) == (2 * gStake game))            &&
+            -- Output datum GameChoice is Just c now instead of Nothing
             traceIfFalse "wrong output datum"            (outputDatum == GameDatum bs (Just c))                             &&
+            -- Play deadline is respected
             traceIfFalse "missed deadline"               (to (gPlayDeadline game) `contains` txInfoValidRange info)         &&
+            -- NFT is passed into output
             traceIfFalse "token missing from output"     (assetClassValueOf (txOutValue ownOutput) (gToken game) == 1)
 
+        -- Player one realizes they won, reveals nonce
         (GameDatum bs (Just c), Reveal nonce) ->
+            -- Player one signs transaction
             traceIfFalse "not signed by first player"    (txSignedBy info (gFirst game))                                    &&
+            -- The nonce agrees with hash
             traceIfFalse "commit mismatch"               (checkNonce bs nonce c)                                            &&
+            -- Reveal deadline is respected
             traceIfFalse "missed deadline"               (to (gRevealDeadline game) `contains` txInfoValidRange info)       &&
+            -- The input contains the stake of both players
             traceIfFalse "wrong stake"                   (lovelaces (txOutValue ownInput) == (2 * gStake game))             &&
+            -- The NFT goes back to player one
             traceIfFalse "NFT must go to first player"   nftToFirst
 
+        -- Player two hasn't accepted to play, player one wants stake back
         (GameDatum _ Nothing, ClaimFirst) ->
+            -- Player one has signed transaction
             traceIfFalse "not signed by first player"    (txSignedBy info (gFirst game))                                    &&
+            -- Play deadline has passed
             traceIfFalse "too early"                     (from (1 + gPlayDeadline game) `contains` txInfoValidRange info)   &&
+            -- Player one has stake
             traceIfFalse "first player's stake missing"  (lovelaces (txOutValue ownInput) == gStake game)                   &&
+            -- Player one gets NFT back
             traceIfFalse "NFT must go to first player"   nftToFirst
 
+        -- Both players have moved but player one didn't win or missed deadline
         (GameDatum _ (Just _), ClaimSecond) ->
+            -- Player two signs transaction
             traceIfFalse "not signed by second player"   (txSignedBy info (gSecond game))                                   &&
+            -- Reveal deadline has passed
             traceIfFalse "too early"                     (from (1 + gRevealDeadline game) `contains` txInfoValidRange info) &&
+            -- Both players have stake
             traceIfFalse "wrong stake"                   (lovelaces (txOutValue ownInput) == (2 * gStake game))             &&
+            -- NFT goes back to player one
             traceIfFalse "NFT must go to first player"   nftToFirst
 
         _                              -> False
   where
+
+    -- Get transaction info
     info :: TxInfo
     info = scriptContextTxInfo ctx
 
+    -- Get input UTxO (shouldn't fail)
     ownInput :: TxOut
     ownInput = case findOwnInput ctx of
         Nothing -> traceError "game input missing"
         Just i  -> txInInfoResolved i
 
+    -- Get output UTxO, for when the game isn't done yet
     ownOutput :: TxOut
     ownOutput = case getContinuingOutputs ctx of
         [o] -> o
         _   -> traceError "expected exactly one game output"
 
+    -- Get datum from output
     outputDatum :: GameDatum
     outputDatum = case gameDatum ownOutput (`findDatum` info) of
         Nothing -> traceError "game output datum not found"
         Just d  -> d
 
+    -- Prove that player one has won by checking nonce in hash
+    -- where first argument is hash, second is nonce, third is choice of player two
     checkNonce :: ByteString -> ByteString -> GameChoice -> Bool
     checkNonce bs nonce cSecond = sha2_256 (nonce `concatenate` cFirst) == bs
       where
@@ -170,8 +202,203 @@ mkGameValidator game bsZero' bsOne' dat red ctx =
             Zero -> bsZero'
             One  -> bsOne'
 
+    -- Ensure NFT goes back to first player (as the first player needs it to start the game)
     nftToFirst :: Bool
     nftToFirst = assetClassValueOf (valuePaidTo info $ gFirst game) (gToken game) == 1
 ```
+
+In the above function, the second and third `ByteString` arguments are unfortunately necessary to represent the 0 and 1 options as it is not possible to use string literals to get bytestrings in Haskell that is compiled to Plutus Core.
+
+### Type: [Gaming](https://youtu.be/uwZ903Zd0DU?t=1404)
+
+The `Gaming` type serves to combine the datum and redeemer:
+
+```haskell
+data Gaming
+instance Scripts.ValidatorTypes Gaming where
+    type instance DatumType Gaming = GameDatum
+    type instance RedeemerType Gaming = GameRedeemer
+```
+
+### Function: [typedGameValidator](https://youtu.be/uwZ903Zd0DU?t=1414)
+
+The `typedGameValidator` function compiles `mkGameValidator` to Plutus Core:
+
+```haskell
+bsZero, bsOne :: ByteString
+bsZero = "0"
+bsOne  = "1"
+
+typedGameValidator :: Game -> Scripts.TypedValidator Gaming
+typedGameValidator game = Scripts.mkTypedValidator @Gaming
+    ($$(PlutusTx.compile [|| mkGameValidator ||])
+        `PlutusTx.applyCode` PlutusTx.liftCode game
+        `PlutusTx.applyCode` PlutusTx.liftCode bsZero
+        `PlutusTx.applyCode` PlutusTx.liftCode bsOne)
+    $$(PlutusTx.compile [|| wrap ||])
+  where
+    wrap = Scripts.wrapValidator @GameDatum @GameRedeemer
+```
+
+### Function: [gameValidator](https://youtu.be/uwZ903Zd0DU?t=1450)
+
+The `gameValidator` function converts our `typedGameValidator` into a Validator:
+
+```haskell
+gameValidator :: Game -> Validator
+gameValidator = Scripts.validatorScript . typedGameValidator
+```
+
+### Function: [gameAddress](https://youtu.be/uwZ903Zd0DU?t=1450)
+
+The `gameAddress` function converts our `gameValidator` into a Ledger.Address:
+
+```haskell
+gameAddress :: Game -> Ledger.Address
+gameAddress = scriptAddress . gameValidator
+```
+
+## [Off-chain Script](https://youtu.be/uwZ903Zd0DU?t=1454)
+
+### Function: [findGameOutput](https://youtu.be/uwZ903Zd0DU?t=1454)
+
+The `findGameOutput` attempts to find the NFT-bearing UTxO:
+
+```haskell
+findGameOutput :: Game -> Contract w s Text (Maybe (TxOutRef, TxOutTx, GameDatum))
+findGameOutput game = do
+    -- Get all UTxOs at the game address
+    utxos <- utxoAt $ gameAddress game
+    return $ do
+
+        -- Use Data.List find to find the first output that contains the NFT
+        (oref, o) <- find f $ Map.toList utxos
+
+        -- Get UTxO datum
+        dat       <- gameDatum (txOutTxOut o) (`Map.lookup` txData (txOutTxTx o))
+
+        -- Return corresponding triple
+        return (oref, o, dat)
+  where
+    f :: (TxOutRef, TxOutTx) -> Bool
+    f (_, o) = assetClassValueOf (txOutValue $ txOutTxOut o) (gToken game) == 1
+```
+
+### Function: [waitUntilTimeHasPassed](https://youtu.be/uwZ903Zd0DU?t=1584)
+
+The `waitUntilTimeHasPassed` function gets a POSIX time and waits until it has passed and we are in the next slot:
+
+```haskell
+waitUntilTimeHasPassed :: AsContractError e => POSIXTime -> Contract w s e ()
+waitUntilTimeHasPassed t = do
+
+    -- Get and log current slot
+    s1 <- currentSlot
+    logInfo @String $ "current slot: " ++ show s1 ++ ", waiting until " ++ show t
+
+    -- Waits until POSIX time has come and ensure in the next slot
+    void $ awaitTime t >> waitNSlots 1
+
+    -- Get and log current slot
+    s2 <- currentSlot
+    logInfo @String $ "waited until: " ++ show s2
+```
+
+### Type: [FirstParams](https://youtu.be/uwZ903Zd0DU?t=1650)
+
+The `FirstParams` type will initiate the game by giving some key parameters:
+
+```haskell
+data FirstParams = FirstParams
+    { fpSecond         :: !PubKeyHash      -- Player two
+    , fpStake          :: !Integer         -- Stake amount
+    , fpPlayDeadline   :: !POSIXTime       -- Play deadline
+    , fpRevealDeadline :: !POSIXTime       -- Reveal deadline
+    , fpNonce          :: !ByteString      -- Nonce
+    , fpCurrency       :: !CurrencySymbol  -- NFT currency symbol
+    , fpTokenName      :: !TokenName       -- NFT token name
+    , fpChoice         :: !GameChoice      -- Choice
+    } deriving (Show, Generic, FromJSON, ToJSON, ToSchema)
+```
+
+### Function: [firstGame](https://youtu.be/uwZ903Zd0DU?t=1678)
+
+The `firstGame` function initializes the game for player one:
+
+
+```haskell
+firstGame :: forall w s. FirstParams -> Contract w s Text ()
+firstGame fp = do
+
+    -- Get own public key hash
+    pkh <- pubKeyHash <$> Contract.ownPubKey
+
+    -- Initialize Game instance
+    let game = Game
+            { gFirst          = pkh
+            , gSecond         = fpSecond fp
+            , gStake          = fpStake fp
+            , gPlayDeadline   = fpPlayDeadline fp
+            , gRevealDeadline = fpRevealDeadline fp
+            , gToken          = AssetClass (fpCurrency fp, fpTokenName fp)
+            }
+
+        -- Stake plus the NFT
+        v    = lovelaceValueOf (fpStake fp) <> assetClassValue (gToken game) 1
+
+        -- Player one choice
+        c    = fpChoice fp
+
+        -- Compute the hash using the nonce and choice
+        bs   = sha2_256 $ fpNonce fp `concatenate` if c == Zero then bsZero else bsOne
+
+        -- Produce a script output at this address with the datum that contains the hash and value
+        tx   = Constraints.mustPayToTheScript (GameDatum bs Nothing) v
+
+    -- Submit transaction, wait for confirmation, and log info
+    ledgerTx <- submitTxConstraints (typedGameValidator game) tx
+    void $ awaitTxConfirmed $ txId ledgerTx
+    logInfo @String $ "made first move: " ++ show (fpChoice fp)
+
+    -- Wait until play deadline has passed
+    waitUntilTimeHasPassed $ fpPlayDeadline fp
+
+    -- Find UTxO with NFT
+    m   <- findGameOutput game
+    now <- currentTime
+    case m of
+
+        -- Case of NFT not found
+        -- Shouldn't happen because NFT should end up address again even if player two moves
+        Nothing             -> throwError "game output not found"
+
+        -- Case of found NFT
+        Just (oref, o, dat) -> case dat of
+
+            -- Deadline passed, player two hasn't moved, invoke ClaimFirst redeemer
+            GameDatum _ Nothing -> do
+                logInfo @String "second player did not play"
+                let lookups = Constraints.unspentOutputs (Map.singleton oref o) <>
+                              Constraints.otherScript (gameValidator game)
+                    tx'     = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData ClaimFirst) <>
+                              Constraints.mustValidateIn (from now)
+                ledgerTx' <- submitTxConstraintsWith @Gaming lookups tx'
+                void $ awaitTxConfirmed $ txId ledgerTx'
+                logInfo @String "reclaimed stake"
+
+            GameDatum _ (Just c') | c' == c -> do
+
+                logInfo @String "second player played and lost"
+                let lookups = Constraints.unspentOutputs (Map.singleton oref o) <>
+                              Constraints.otherScript (gameValidator game)
+                    tx'     = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData $ Reveal $ fpNonce fp) <>
+                              Constraints.mustValidateIn (to $ now + 1000)
+                ledgerTx' <- submitTxConstraintsWith @Gaming lookups tx'
+                void $ awaitTxConfirmed $ txId ledgerTx'
+                logInfo @String "victory"
+
+            _ -> logInfo @String "second player played and won"
+```
+
 
 ### More Notes Soon...
