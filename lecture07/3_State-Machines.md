@@ -91,3 +91,7 @@ smThreadToken :: Maybe AssetClass
 ```
 
 Using this field will automatically take care of minting the NFT and threading it through the state transitions
+
+---
+
+##### Continue [watching](https://youtu.be/uwZ903Zd0DU?t=3014) for a walkthrough comparison on the [StateMachine implementation](https://github.com/input-output-hk/plutus-pioneer-program/blob/main/code/week07/src/Week07/StateMachine.hs) of our game...
