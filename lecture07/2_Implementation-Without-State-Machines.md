@@ -325,7 +325,6 @@ data FirstParams = FirstParams
 
 The `firstGame` function initializes the game for player one:
 
-
 ```haskell
 firstGame :: forall w s. FirstParams -> Contract w s Text ()
 firstGame fp = do
@@ -378,27 +377,168 @@ firstGame fp = do
             -- Deadline passed, player two hasn't moved, invoke ClaimFirst redeemer
             GameDatum _ Nothing -> do
                 logInfo @String "second player did not play"
+
+                    -- Provide the found UTxO and the game validator
                 let lookups = Constraints.unspentOutputs (Map.singleton oref o) <>
                               Constraints.otherScript (gameValidator game)
+
+                    -- Spend found UTxO with redeemer
                     tx'     = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData ClaimFirst) <>
                               Constraints.mustValidateIn (from now)
                 ledgerTx' <- submitTxConstraintsWith @Gaming lookups tx'
                 void $ awaitTxConfirmed $ txId ledgerTx'
                 logInfo @String "reclaimed stake"
 
+            -- Player two moved and lost
             GameDatum _ (Just c') | c' == c -> do
 
                 logInfo @String "second player played and lost"
+
+                    -- Provide the found UTxO and the game validator
                 let lookups = Constraints.unspentOutputs (Map.singleton oref o) <>
                               Constraints.otherScript (gameValidator game)
+
+                    -- Reveal nonce with Reveal redeemer before deadline has passed
                     tx'     = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData $ Reveal $ fpNonce fp) <>
                               Constraints.mustValidateIn (to $ now + 1000)
+
+                -- Submit transaction, wait for confirmation and log info
                 ledgerTx' <- submitTxConstraintsWith @Gaming lookups tx'
                 void $ awaitTxConfirmed $ txId ledgerTx'
                 logInfo @String "victory"
 
+            -- Player two moved and won
             _ -> logInfo @String "second player played and won"
 ```
 
+### Type: [SecondParams](https://youtu.be/uwZ903Zd0DU?t=1886)
 
-### More Notes Soon...
+The `SecondParams` type serves a very similary function to `FirstParams` but initiates player two's move:
+
+```haskell
+data SecondParams = SecondParams
+    { spFirst          :: !PubKeyHash
+    , spStake          :: !Integer
+    , spPlayDeadline   :: !POSIXTime
+    , spRevealDeadline :: !POSIXTime
+    , spCurrency       :: !CurrencySymbol
+    , spTokenName      :: !TokenName
+    , spChoice         :: !GameChoice
+    } deriving (Show, Generic, FromJSON, ToJSON, ToSchema)
+```
+
+
+### Function: [secondGame](https://youtu.be/uwZ903Zd0DU?t=1908)
+
+The `secondGame` function initializes the game for player one:
+
+```haskell
+secondGame :: forall w s. SecondParams -> Contract w s Text ()
+secondGame sp = do
+
+    -- Get own public key hash
+    pkh <- pubKeyHash <$> Contract.ownPubKey
+
+    -- Initialize game instance
+    let game = Game
+            { gFirst          = spFirst sp
+            , gSecond         = pkh
+            , gStake          = spStake sp
+            , gPlayDeadline   = spPlayDeadline sp
+            , gRevealDeadline = spRevealDeadline sp
+            , gToken          = AssetClass (spCurrency sp, spTokenName sp)
+            }
+
+    -- Find NFT-bearing UTxO
+    m <- findGameOutput game
+    case m of
+
+        -- Case of game found, player two choice still Nothing
+        Just (oref, o, GameDatum bs Nothing) -> do
+            logInfo @String "running game found"
+            now <- currentTime
+
+            -- Token is NFT
+            let token   = assetClassValue (gToken game) 1
+
+            -- The value we put in the new output at the same time
+            -- Old one contains NFT and player one's stake, new one adds player two's stake
+            let v       = let x = lovelaceValueOf (spStake sp) in x <> x <> token
+
+                -- The choice
+                c       = spChoice sp
+
+                -- Provide the UTxO, game validator, and script instance because we are producing one
+                lookups = Constraints.unspentOutputs (Map.singleton oref o)                                   <>
+                          Constraints.otherScript (gameValidator game)                                        <>
+                          Constraints.typedValidatorLookups (typedGameValidator game)
+
+                -- Spend existing UTxO with Play redeemer and choice c
+                tx      = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData $ Play c) <>
+
+                -- Create new UTxO with updated datum with same hash plust player two's move and v
+                          Constraints.mustPayToTheScript (GameDatum bs $ Just c) v                            <>
+
+                -- Must do this before deadline passes
+                          Constraints.mustValidateIn (to now)
+
+            -- Submit transaction, wait for confirmation and log info
+            ledgerTx <- submitTxConstraintsWith @Gaming lookups tx
+            let tid = txId ledgerTx
+            void $ awaitTxConfirmed tid
+            logInfo @String $ "made second move: " ++ show (spChoice sp)
+
+            -- Wait until reveal deadline has passed
+            waitUntilTimeHasPassed $ spRevealDeadline sp
+
+            -- Again try to find UTxO, which could now be a different one
+            m'   <- findGameOutput game
+            now' <- currentTime
+            case m' of
+
+                -- Case of no UTxO found, i.e. player one revealed and won
+                Nothing             -> logInfo @String "first player won"
+
+                -- Case of UTxO found, i.e. player one didn't reveal / lost
+                Just (oref', o', _) -> do
+                    logInfo @String "first player didn't reveal"
+                    let lookups' = Constraints.unspentOutputs (Map.singleton oref' o')                                     <>
+                                   Constraints.otherScript (gameValidator game)
+
+                        -- Spend the UTxO
+                        tx'      = Constraints.mustSpendScriptOutput oref' (Redeemer $ PlutusTx.toBuiltinData ClaimSecond) <>
+
+                        -- Ensure that reveal deadline has passed
+                                   Constraints.mustValidateIn (from now')                                                  <>
+                        -- Return NFT to player one
+                                   Constraints.mustPayToPubKey (spFirst sp) token
+
+                    -- Submit transaction, wait for confirmation, and log info
+                    ledgerTx' <- submitTxConstraintsWith @Gaming lookups' tx'
+                    void $ awaitTxConfirmed $ txId ledgerTx'
+                    logInfo @String "second player won"
+
+        -- Case of game not found
+        _ -> logInfo @String "no running game found"
+```
+
+### Type: [GameSchema](https://youtu.be/uwZ903Zd0DU?t=2124)
+
+The `GameSchema` type defines two endpoints for player one / `FirstParams`, and for player two / `SecondParams`:
+
+```haskell
+type GameSchema = Endpoint "first" FirstParams .\/ Endpoint "second" SecondParams
+
+```
+
+### Function: [endpoints](https://youtu.be/uwZ903Zd0DU?t=2138)
+
+The `endpoints` function offers a choice between the two defined endpoints:
+
+```haskell
+endpoints :: Contract () GameSchema Text ()
+endpoints = (first `select` second) >> endpoints
+  where
+    first  = endpoint @"first"  >>= firstGame
+    second = endpoint @"second" >>= secondGame
+```
