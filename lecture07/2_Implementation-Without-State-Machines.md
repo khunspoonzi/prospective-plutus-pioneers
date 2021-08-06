@@ -528,7 +528,6 @@ The `GameSchema` type defines two endpoints for player one / `FirstParams`, and 
 
 ```haskell
 type GameSchema = Endpoint "first" FirstParams .\/ Endpoint "second" SecondParams
-
 ```
 
 ### Function: [endpoints](https://youtu.be/uwZ903Zd0DU?t=2138)
@@ -541,4 +540,102 @@ endpoints = (first `select` second) >> endpoints
   where
     first  = endpoint @"first"  >>= firstGame
     second = endpoint @"second" >>= secondGame
+```
+
+## [Test Script](https://youtu.be/uwZ903Zd0DU?t=2176)
+
+### Function: [test'](https://youtu.be/uwZ903Zd0DU?t=2184)
+
+The `test'` function will run a simulated game based on two game choices:
+
+```haskell
+gameTokenCurrency :: CurrencySymbol
+gameTokenCurrency = "ff"
+
+gameTokenName :: TokenName
+gameTokenName = "STATE TOKEN"
+
+test' :: GameChoice -> GameChoice -> IO ()
+test' c1 c2 = runEmulatorTraceIO' def emCfg def $ myTrace c1 c2
+  where
+    emCfg :: EmulatorConfig
+    emCfg = EmulatorConfig $ Left $ Map.fromList
+        -- Provice wallet 1 with NFT
+        [ (Wallet 1, v <> assetClassValue (AssetClass (gameTokenCurrency, gameTokenName)) 1)
+        , (Wallet 2, v)
+        ]
+
+    v :: Value
+    v = Ada.lovelaceValueOf 1_000_000_000
+```
+
+Note that in a real scenario, we would have to generate the NFT, e.g. using `mintContract` or our own contract.
+
+### Function: [test](https://youtu.be/uwZ903Zd0DU?t=2198)
+
+The `test` function runs all four combinations of `test'` in sequence:
+
+```haskell
+test :: IO ()
+test = do
+    test' Zero Zero
+    test' Zero One
+    test' One Zero
+    test' One One
+```
+
+### Function: [myTrace](https://youtu.be/uwZ903Zd0DU?t=2264)
+
+The `myTrace` function defines the logic that will be used in `test` and `test'`:
+
+```haskell
+myTrace :: GameChoice -> GameChoice -> EmulatorTrace ()
+myTrace c1 c2 = do
+    Extras.logInfo $ "first move: " ++ show c1 ++ ", second move: " ++ show c2
+
+    -- Active endpoints contract in wallets 1 and 2
+    h1 <- activateContractWallet (Wallet 1) endpoints
+    h2 <- activateContractWallet (Wallet 2) endpoints
+
+        -- Look up public key hash of wallets 1 and 2
+    let pkh1      = pubKeyHash $ walletPubKey $ Wallet 1
+        pkh2      = pubKeyHash $ walletPubKey $ Wallet 2
+        -- Define 5 ADA stake
+        stake     = 5_000_000
+        -- Define play and reveal deadlines
+        deadline1 = slotToBeginPOSIXTime def 5
+        deadline2 = slotToBeginPOSIXTime def 10
+
+        -- Construct FirstParams and SecondParams
+        fp = FirstParams
+                { fpSecond         = pkh2
+                , fpStake          = stake
+                , fpPlayDeadline   = deadline1
+                , fpRevealDeadline = deadline2
+                , fpNonce          = "SECRETNONCE"
+                , fpCurrency       = gameTokenCurrency
+                , fpTokenName      = gameTokenName
+                , fpChoice         = c1
+                }
+        sp = SecondParams
+                { spFirst          = pkh1
+                , spStake          = stake
+                , spPlayDeadline   = deadline1
+                , spRevealDeadline = deadline2
+                , spCurrency       = gameTokenCurrency
+                , spTokenName      = gameTokenName
+                , spChoice         = c2
+                }
+
+    -- Call first endpoint on wallet 1 with FirstParams
+    callEndpoint @"first" h1 fp
+
+    -- Wait three slots
+    void $ Emulator.waitNSlots 3
+
+    -- Call second endpoint on wallet 2 with SecondParams
+    callEndpoint @"second" h2 sp
+
+    -- Wait ten slots
+    void $ Emulator.waitNSlots 10
 ```
