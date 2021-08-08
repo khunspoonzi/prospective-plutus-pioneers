@@ -92,6 +92,41 @@ smThreadToken :: Maybe AssetClass
 
 Using this field will automatically take care of minting the NFT and threading it through the state transitions
 
+### Type: [StateMachineClient](https://youtu.be/uwZ903Zd0DU?t=3804)
+
+The `StateMachineClient` type has two fields and allows for a wallet to interact with a `StateMachine`:
+
+```haskell
+-- | Client-side definition of a state machine.
+data StateMachineClient s i = StateMachineClient
+    { scInstance :: SM.StateMachineInstance s i
+    -- ^ The instance of the state machine, defining the machine's transitions,
+    --   its final states and its check function.
+    , scChooser  :: [OnChainState s i] -> Either SMContractError (OnChainState s i)
+    -- ^ A function that chooses the relevant on-chain state, given a list of
+    --   all potential on-chain states found at the contract address.
+    }
+
+data StateMachineInstance s i = StateMachineInstance {
+    -- | The state machine specification.
+    stateMachine      :: StateMachine s i,
+    -- | The validator code for this state machine.
+    typedValidator :: TypedValidator (StateMachine s i)
+    }
+```
+
+Here, `scInstance` allows us to initialize a `StateMachineClient` by specifying a state machine and a validator.
+
+If we do not use a thread token mechanism, `scChooser` allows us to define how to pick the right UTxO from a list of UTxOs sitting at the state machine address.
+
+A `StateMachineClient` can be defned by using the `mkStateMachineClient` function as below:
+
+```haskell
+mkStateMachineClient :: forall state input. StateMachineInstance state input -> StateMachineClient state input
+```
+
+
+
 ---
 
 ##### Continue [watching](https://youtu.be/uwZ903Zd0DU?t=3014) for a walkthrough comparison on the [StateMachine implementation](https://github.com/input-output-hk/plutus-pioneer-program/blob/main/code/week07/src/Week07/StateMachine.hs) of our game:
@@ -193,26 +228,36 @@ gameDatum o f = do
 {-# INLINABLE transition #-}
 transition :: Game -> State GameDatum -> GameRedeemer -> Maybe (TxConstraints Void Void, State GameDatum)
 transition game s r = case (stateValue s, stateData s, r) of
+
+    -- Player two makes choice c
     (v, GameDatum bs Nothing, Play c)
         | lovelaces v == gStake game         -> Just ( Constraints.mustBeSignedBy (gSecond game)                    <>
                                                        Constraints.mustValidateIn (to $ gPlayDeadline game)
                                                      , State (GameDatum bs $ Just c) (lovelaceValueOf $ 2 * gStake game)
                                                      )
+
+    -- Player two has played and player one sees they have won
     (v, GameDatum _ (Just _), Reveal _)
         | lovelaces v == (2 * gStake game)   -> Just ( Constraints.mustBeSignedBy (gFirst game)                     <>
                                                        Constraints.mustValidateIn (to $ gRevealDeadline game)
                                                      , State Finished mempty
                                                      )
+
+    -- Player two does not react and player one wants their stake back
     (v, GameDatum _ Nothing, ClaimFirst)
         | lovelaces v == gStake game         -> Just ( Constraints.mustBeSignedBy (gFirst game)                     <>
                                                        Constraints.mustValidateIn (from $ 1 + gPlayDeadline game)
                                                      , State Finished mempty
                                                      )
+
+    -- Both players have played and player one has lost or gets disconnected, i.e. player two wins
     (v, GameDatum _ (Just _), ClaimSecond)
         | lovelaces v == (2 * gStake game)   -> Just ( Constraints.mustBeSignedBy (gSecond game)                    <>
                                                        Constraints.mustValidateIn (from $ 1 + gRevealDeadline game)
                                                      , State Finished mempty
                                                      )
+
+    -- Everything else is invalid
     _                                        -> Nothing
 
     -- Remember that smTransition returns Maybe a tuple of constraints + a new state
@@ -220,7 +265,7 @@ transition game s r = case (stateValue s, stateData s, r) of
 
 {-# INLINABLE final #-}
 final :: GameDatum -> Bool
-final Finished = True
+final Finished = True   -- Determine if is final state
 final _        = False
 
 {-# INLINABLE check #-}
@@ -228,6 +273,7 @@ check :: ByteString -> ByteString -> GameDatum -> GameRedeemer -> ScriptContext 
 check bsZero' bsOne' (GameDatum bs (Just c)) (Reveal nonce) _ =
     sha2_256 (nonce `concatenate` if c == Zero then bsZero' else bsOne') == bs
 check _       _      _                       _              _ = True
+-- Because there is no constraint to check the nonce
 
 {-# INLINABLE gameStateMachine #-}
 gameStateMachine :: Game -> ByteString -> ByteString -> StateMachine GameDatum GameRedeemer
@@ -242,6 +288,7 @@ gameStateMachine game bsZero' bsOne' = StateMachine
 mkGameValidator :: Game -> ByteString -> ByteString -> GameDatum -> GameRedeemer -> ScriptContext -> Bool
 mkGameValidator game bsZero' bsOne' = mkValidator $ gameStateMachine game bsZero' bsOne'
 
+-- StateMachine helps us bundle datum and redeemer
 type Gaming = StateMachine GameDatum GameRedeemer
 
 bsZero, bsOne :: ByteString
@@ -267,6 +314,7 @@ gameValidator = Scripts.validatorScript . typedGameValidator
 gameAddress :: Game -> Ledger.Address
 gameAddress = scriptAddress . gameValidator
 
+-- A StateMachineClient used to interact with StateMachine from wallet contract monad
 gameClient :: Game -> StateMachineClient GameDatum GameRedeemer
 gameClient game = mkStateMachineClient $ StateMachineInstance (gameStateMachine' game) (typedGameValidator game)
 
@@ -279,6 +327,7 @@ data FirstParams = FirstParams
     , fpChoice         :: !GameChoice
     } deriving (Show, Generic, FromJSON, ToJSON, ToSchema)
 
+-- Convert StateMachine error type to Text
 mapError' :: Contract w s SMContractError a -> Contract w s Text a
 mapError' = mapError $ pack . show
 
@@ -288,6 +337,8 @@ waitUntilTimeHasPassed t = void $ awaitTime t >> waitNSlots 1
 firstGame :: forall s. FirstParams -> Contract (Last ThreadToken) s Text ()
 firstGame fp = do
     pkh <- pubKeyHash <$> Contract.ownPubKey
+
+    -- Helper for minting NFT
     tt  <- mapError' getThreadToken
     let game   = Game
             { gFirst          = pkh
@@ -301,8 +352,13 @@ firstGame fp = do
         v      = lovelaceValueOf (fpStake fp)
         c      = fpChoice fp
         bs     = sha2_256 $ fpNonce fp `concatenate` if c == Zero then bsZero else bsOne
+
+    -- Mint NFT corresponding to thread token, create UTxO at state machine address,
+    -- and put NFT in UTxO, given client datum value
     void $ mapError' $ runInitialise client (GameDatum bs Nothing) v
     logInfo @String $ "made first move: " ++ show (fpChoice fp)
+
+    -- We tell thred token so player two knows how to find the corect UTxO
     tell $ Last $ Just tt
 
     waitUntilTimeHasPassed $ fpPlayDeadline fp
@@ -312,11 +368,13 @@ firstGame fp = do
         Nothing             -> throwError "game output not found"
         Just ((o, _), _) -> case tyTxOutData o of
 
+            -- Player two hasn't responded, player one reclaims stake
             GameDatum _ Nothing -> do
                 logInfo @String "second player did not play"
-                void $ mapError' $ runStep client ClaimFirst
+                void $ mapError' $ runStep client ClaimFirst -- Transition the state machine
                 logInfo @String "first player reclaimed stake"
 
+            -- Player two has moved and lost, player one reveals and wins
             GameDatum _ (Just c') | c' == c -> do
                 logInfo @String "second player played and lost"
                 void $ mapError' $ runStep client $ Reveal $ fpNonce fp
@@ -350,6 +408,8 @@ secondGame sp = do
         Nothing          -> logInfo @String "no running game found"
         Just ((o, _), _) -> case tyTxOutData o of
             GameDatum _ Nothing -> do
+
+                -- Player two responds and makes choice
                 logInfo @String "running game found"
                 void $ mapError' $ runStep client $ Play $ spChoice sp
                 logInfo @String $ "made second move: " ++ show (spChoice sp)
