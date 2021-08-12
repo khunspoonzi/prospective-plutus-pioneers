@@ -148,4 +148,241 @@ The `mkStateMachine` smart constructor takes three arguments: thread token, tran
 
 In the case of the [rock, paper, scissors example](../lecture07/3_State-Machines.md), we couldn't use the `mkStateMachine` smart constructor because the hash check for the game choice could not be expressed as a constraint.
 
+### Function: [mkTSValidator](https://youtu.be/zW3D2iM5uVg?t=782)
+
+The `mkTSValidator` function defines a validator using `tsStateMachine`:
+
+```haskell
+{-# INLINABLE mkTSValidator #-}
+mkTSValidator :: TokenSale -> Integer -> TSRedeemer -> ScriptContext -> Bool
+mkTSValidator = mkValidator . tsStateMachine
+```
+
+### Type: [StateMachine]()
+
+The`TS` type combines the datum and redeemer using `StateMachine`:
+
+```haskell
+type TS = StateMachine Integer TSRedeemer
+```
+
+### Function: [tsTypedValidator](https://youtu.be/zW3D2iM5uVg?t=798)
+
+The `tsTypedValidator` function compiles `mkTSValidator` to Plutus Core:
+
+```haskell
+tsTypedValidator :: TokenSale -> Scripts.TypedValidator TS
+tsTypedValidator ts = Scripts.mkTypedValidator @TS
+    ($$(PlutusTx.compile [|| mkTSValidator ||]) `PlutusTx.applyCode` PlutusTx.liftCode ts)
+    $$(PlutusTx.compile [|| wrap ||])
+  where
+    wrap = Scripts.wrapValidator @Integer @TSRedeemer
+```
+
+### Function: [tsValidator](https://youtu.be/zW3D2iM5uVg?t=802)
+
+The `tsValidator` function converts our `tsTypedValidator` into a `Validator`:
+
+```haskell
+tsValidator :: TokenSale -> Validator
+tsValidator = Scripts.validatorScript . tsTypedValidator
+```
+
+### Function: [tsAddress](https://youtu.be/zW3D2iM5uVg?t=804)
+
+The `tsAddress` function converts our `tsValidator` into a `Ledger.Address`:
+
+```haskell
+tsAddress :: TokenSale -> Ledger.Address
+tsAddress = scriptAddress . tsValidator
+```
+
+### Function: [tsClient](https://youtu.be/zW3D2iM5uVg?t=806)
+
+The `tsClient` function defines the state machine client using `mkStateMachineClient`:
+
+```haskell
+tsClient :: TokenSale -> StateMachineClient Integer TSRedeemer
+tsClient ts = mkStateMachineClient $ StateMachineInstance (tsStateMachine ts) (tsTypedValidator ts)
+```
+
+### Function: [mapErrorSM](https://youtu.be/zW3D2iM5uVg?t=826)
+
+The `mapErrorSM` function converts our state machine error type to `Text`:
+
+```haskell
+mapErrorSM :: Contract w s SMContractError a -> Contract w s Text a
+mapErrorSM = mapError $ pack . show
+```
+
+## [Off-chain Script](https://youtu.be/zW3D2iM5uVg?t=854)
+
+### Function: [startTS](https://youtu.be/zW3D2iM5uVg?t=854)
+
+The `startTS` function starts the token sale with an `AssetClass` and a `Bool` of whether to use a thread token:
+
+```haskell
+startTS :: AssetClass -> Bool -> Contract (Last TokenSale) s Text ()
+startTS token useTT = do
+
+    -- Get seller's public key hash
+    pkh <- pubKeyHash <$> Contract.ownPubKey
+
+    -- Get thread token if necessary
+    tt  <- if useTT then Just <$> mapErrorSM getThreadToken else return Nothing
+
+    -- Define TokenSale instance
+    let ts = TokenSale
+            { tsSeller = pkh
+            , tsToken  = token
+            , tsTT     = tt
+            }
+
+        -- Get state machine client
+        client = tsClient ts
+
+    -- Create the first UTxO at the state machine address, with the client, datum, and value
+    void $ mapErrorSM $ runInitialise client 0 mempty
+
+    -- Tell the ts instance so other parties could discover the value of ts and find the state machine
+    tell $ Last $ Just ts
+
+    -- Log an info message
+    logInfo $ "started token sale " ++ show ts
+```
+
+
+### Function: [setPrice](https://youtu.be/zW3D2iM5uVg?t=1092)
+
+The `setPrice` function invokes `runStep` with the client and `SetPrice` redeemer:
+
+```haskell
+setPrice :: TokenSale -> Integer -> Contract w s Text ()
+setPrice ts p = void $ mapErrorSM $ runStep (tsClient ts) $ SetPrice p
+```
+
+### Function: [addTokens](https://youtu.be/zW3D2iM5uVg?t=1122)
+
+The `addTokens` function invokes `runStep` with the client and `AddTokens` redeemer:
+
+```haskell
+addTokens :: TokenSale -> Integer -> Contract w s Text ()
+addTokens ts n = void $ mapErrorSM $ runStep (tsClient ts) $ AddTokens n
+```
+
+### Function: [buyTokens](https://youtu.be/zW3D2iM5uVg?t=1126)
+
+The `buyTokens` function invokes `runStep` with the client and `BuyTokens` redeemer:
+
+```haskell
+buyTokens :: TokenSale -> Integer -> Contract w s Text ()
+buyTokens ts n = void $ mapErrorSM $ runStep (tsClient ts) $ BuyTokens n
+```
+
+### Function: [withdraw](https://youtu.be/zW3D2iM5uVg?t=1130)
+
+The `withdraw` function invokes `runStep` with the client and `Withdraw` redeemer:
+
+```haskell
+withdraw :: TokenSale -> Integer -> Integer -> Contract w s Text ()
+withdraw ts n l = void $ mapErrorSM $ runStep (tsClient ts) $ Withdraw n l
+```
+
+### Type: [TSStartSchema](https://youtu.be/zW3D2iM5uVg?t=1168)
+
+The `TSStartSchema` type starts the token sale contract:
+
+```haskell
+type TSStartSchema =
+        Endpoint "start"      (CurrencySymbol, TokenName, Bool)
+```
+
+### Function: [TSUseSchema](https://youtu.be/zW3D2iM5uVg?t=1192)
+
+The `TSUseSchema` type define the operations available once the contract is running:
+
+```haskell
+type TSUseSchema =
+        Endpoint "set price"  Integer
+    .\/ Endpoint "add tokens" Integer
+    .\/ Endpoint "buy tokens" Integer
+    .\/ Endpoint "withdraw"   (Integer, Integer)
+```
+
+### Change: [Endpoint Signatures](https://youtu.be/zW3D2iM5uVg?t=1220)
+
+It should be noted that the signature of endpoints has changed:
+
+```haskell
+-- Old Signature
+endpoint :: forall l a w s e. (HasEndpoint l a s, AsContractError e) => Contract w s e a
+
+-- New Signature
+endpoint :: forall l a w s e b. (HasEndpoint l a s, AsContractError e, FromJSON a) => (a -> Contract w s e b) -> Promise w s e b
+```
+
+Previously, endpoints that corresponded to parameters of type `a` simply returned a contract of type `a` and would block until `a` was provided from the outside.
+
+Now, there is an additional continuation argument, which is a function that, given `a`, returns a contract of type `b`. The `endpoint` function now returns a `Promise` using `b`.
+
+Here, a `Promise` is defined as a "wrapper indicating that this contract starts with a waiting action. For use with `select`". In essence, a `Promise` is basically a `Contract` that first waits for external input.
+
+In practice we will make use if the following methods:
+
+```haskell
+awaitPromise :: Promise w s e a -> Contract w s e a
+select :: forall w s e a. Promise w s e a -> Promise w s e a -> Promise w s e a
+```
+
+### Function: [startEndpoint](https://youtu.be/zW3D2iM5uVg?t=1346)
+
+The `startEndpoint` function allows the seller to start the token sale:
+
+```haskell
+startEndpoint :: Contract (Last TokenSale) TSStartSchema Text ()
+startEndpoint = forever  -- Forever repeats a monadic computation
+
+              -- Handle and log errors
+              $ handleError logError
+
+              -- Await promise
+              $ awaitPromise
+
+              -- Call endpoint with the continuation function, expecting a Promise
+              $ endpoint @"start" $ \(cs, tn, useTT) -> startTS (AssetClass (cs, tn)) useTT
+```
+
+### Function: [useEndpoints](https://youtu.be/zW3D2iM5uVg?t=1346)
+
+The `useEndpoints` function allows the token sale contract to perform operations:
+
+```haskell
+useEndpoints :: TokenSale -> Contract () TSUseSchema Text ()
+useEndpoints ts = forever  -- Forever repeats a monadic computation
+
+                -- Handle and log errors
+                $ handleError logError
+
+                -- Await promise for contract
+                $ awaitPromise
+
+                -- Apply select to operations
+                $ setPrice' `select` addTokens' `select` buyTokens' `select` withdraw'
+  where
+
+    -- Define operation Promises with continuation functions
+    setPrice'  = endpoint @"set price"  $ setPrice ts
+    addTokens' = endpoint @"add tokens" $ addTokens ts
+    buyTokens' = endpoint @"buy tokens" $ buyTokens ts
+    withdraw'  = endpoint @"withdraw"   $ uncurry (withdraw ts)
+```
+
+In the promise definitions above, `uncurry` handles the expected two `Integer` arguments in `withdraw`:
+
+```haskell
+uncurry :: (a -> b -> c) -> (a, b) -> c
+```
+
+In this case, `uncurry` takes a function that takes two arguments `a` and `b` and turns it into a function that takes an `(a, b)` tuple. In other words, this is simply the inverse of currying a function.
+
 ### More Notes Soon
