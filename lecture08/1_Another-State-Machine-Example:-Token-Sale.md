@@ -384,5 +384,3 @@ uncurry :: (a -> b -> c) -> (a, b) -> c
 ```
 
 In this case, `uncurry` takes a function that takes two arguments `a` and `b` and turns it into a function that takes an `(a, b)` tuple. In other words, this is simply the inverse of currying a function.
-
-### More Notes Soon
