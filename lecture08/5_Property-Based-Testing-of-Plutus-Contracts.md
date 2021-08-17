@@ -121,41 +121,92 @@ instance ContractModel TSModel where
         -- Otherwise, do nothing and wait one step if not started
         wait 1
 
+    -- Define the effect of buying tokens
     nextState (BuyTokens v w n) = do
+
+        -- Check that number of tokens to buy is positive
         when (n > 0) $ do
+            -- Get the token sale
             m <- getTSState v
+
             case m of
+                -- Case of token sale found
                 Just t
+
+                    -- Check if there are at least n tokens on sale
                     | t ^. tssToken >= n -> do
+                            -- Get token price
                         let p = t ^. tssPrice
+                            -- Compute total price
                             l = p * n
+
+                        -- Withdraw total price from wallet
                         withdraw w $ lovelaceValueOf l
+
+                        -- Deposit n bought tokens into wallet
                         deposit w $ assetClassValue (tokens Map.! v) n
+
+                        -- Increase total price in sale
                         (tsModel . ix v . tssLovelace) $~ (+ l)
+
+                        -- Decrease n tokens from sale
                         (tsModel . ix v . tssToken)    $~ (+ (- n))
+
+                -- Case of no token sale found
                 _ -> return ()
+
+        -- Otherwise, wait one step
         wait 1
 
+    -- Define the effect of withdrawing
     nextState (Withdraw v w n l) = do
+
+        -- Check that owner of the token sale is the one withdrawing
         when (v == w) $ do
+            -- Get the token sale
             m <- getTSState v
             case m of
+                -- Case of token sale found
                 Just t
+                    -- Check that there are at least n tokens and l Lovelace
                     | t ^. tssToken >= n && t ^. tssLovelace >= l -> do
+                        -- Deposit Lovelace and tokens in wallet
                         deposit w $ lovelaceValueOf l <> assetClassValue (tokens Map.! w) n
+
+                        -- Remove Lovelace and tokens from sale
                         (tsModel . ix v . tssLovelace) $~ (+ (- l))
                         (tsModel . ix v . tssToken) $~ (+ (- n))
+
+                -- Case of token sale not started
                 _ -> return ()
+
+        -- Otherwise, wait one step
         wait 1
 
-    perform h _ cmd = case cmd of
+    -- Define method to link model operations to emulator operations
+    perform h _ cmd = case cmd of  -- h gives access to contract handles (1:53:44)
+
+        -- Start the contract for wallet w
         (Start w)          -> callEndpoint @"start"      (h $ StartKey w) (tokenCurrencies Map.! w, tokenNames Map.! w, False) >> delay 1
+
+        -- Set price of token sale
         (SetPrice v w p)   -> callEndpoint @"set price"  (h $ UseKey v w) p                                                    >> delay 1
+
+        -- Add tokens to token sale
         (AddTokens v w n)  -> callEndpoint @"add tokens" (h $ UseKey v w) n                                                    >> delay 1
+
+        -- Buy tokens from token sale
         (BuyTokens v w n)  -> callEndpoint @"buy tokens" (h $ UseKey v w) n                                                    >> delay 1
+
+        -- Withdraw Lovelace and tokens from token sale
         (Withdraw v w n l) -> callEndpoint @"withdraw"   (h $ UseKey v w) (n, l)                                               >> delay 1
 
+    -- Define pre-conditions under which it is acceptable to provide an action
+
+    -- Start requires that a token sale has not yet been started
     precondition s (Start w)          = isNothing $ getTSState' s w
+
+    -- All other actions requre that a token sale has already been started
     precondition s (SetPrice v _ _)   = isJust    $ getTSState' s v
     precondition s (AddTokens v _ _)  = isJust    $ getTSState' s v
     precondition s (BuyTokens v _ _)  = isJust    $ getTSState' s v
@@ -256,16 +307,36 @@ tokenAmt :: Integer
 tokenAmt = 1_000
 ```
 
-### Function: [prop_TS](https://youtu.be/zW3D2iM5uVg?t=6378)
+### Function: [delay](https://youtu.be/zW3D2iM5uVg?t=6938)
 
-The `prop_TS` function initializes the simulation with an `InitialDistribution`:
+The `delay` helper function implements `waitNSlots`:
+
+```haskell
+delay :: Int -> EmulatorTrace ()
+delay = void . waitNSlots . fromIntegral
+```
+
+### Function: [instanceSpec](https://youtu.be/zW3D2iM5uVg?t=7114)
+
+The `instanceSpec` function links keys to actual contracts by providing a list of contract instances we want to run:
+
+```haskell
+instanceSpec :: [ContractInstanceSpec TSModel]
+instanceSpec =
+    [ContractInstanceSpec (StartKey w) w startEndpoint | w <- wallets] ++
+    [ContractInstanceSpec (UseKey v w) w $ useEndpoints $ tss Map.! v | v <- wallets, w <- wallets]
+```
+
+### Function: [prop_TS](https://youtu.be/zW3D2iM5uVg?t=7198)
+
+The `prop_TS` function links the model with QuickCheck and initializes an `InitialDistribution`:
 
 ```haskell
 prop_TS :: Actions TSModel -> Property
 prop_TS = withMaxSuccess 100 . propRunActionsWithOptions
     (defaultCheckOptions & emulatorConfig .~ EmulatorConfig (Left d) def def)
-    instanceSpec
-    (const $ pure True)
+    instanceSpec         -- As defined previously
+    (const $ pure True)  -- true is another word for return from applicative
   where
     d :: InitialDistribution
     d = Map.fromList $ [ ( w
@@ -274,6 +345,3 @@ prop_TS = withMaxSuccess 100 . propRunActionsWithOptions
                        | w <- wallets
                        ]
 ```
-
-
-### More Notes Soon...
