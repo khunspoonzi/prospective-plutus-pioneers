@@ -40,9 +40,6 @@ The idea in this case is that there are several wallets that run their own token
 We declare `TSModel` as an instance of the `ContractModel` type class to define how our model should behave:
 
 ```haskell
-tests :: TestTree
-tests = testProperty "token sale model" prop_TS
-
 instance ContractModel TSModel where
 
     -- Define an associative data type to represent an action
@@ -345,3 +342,70 @@ prop_TS = withMaxSuccess 100 . propRunActionsWithOptions
                        | w <- wallets
                        ]
 ```
+
+## [Running The Test](https://youtu.be/zW3D2iM5uVg?t=7638)
+
+The test we defined above can be converted into a Tasty-compatible `TestTree` using the following function:
+
+```haskell
+tests :: TestTree
+tests = testProperty "token sale model" prop_TS
+```
+
+The test suite itself will be configured in the Cabal file like so:
+
+```
+test-suite plutus-pioneer-program-week08-tests
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  hs-source-dirs: test
+  other-modules:       Spec.Model
+                     , Spec.Trace
+  default-language: Haskell2010
+  ghc-options:         -Wall -fobject-code -fno-ignore-interface-pragmas -fno-omit-interface-pragmas
+  build-depends:       base ^>=4.14.1.0
+                     , containers
+                     , data-default
+                     , freer-extras
+                     , lens
+                     , plutus-contract
+                     , plutus-ledger
+                     , plutus-pioneer-program-week08
+                     , plutus-tx
+                     , QuickCheck
+                     , tasty
+                     , tasty-quickcheck
+                     , text
+  if !(impl(ghcjs) || os(ghcjs))
+    build-depends: plutus-tx-plugin -any
+```
+
+In this case, tests will be compiled into executables wherein a non-zero return code indicates a failed test.
+
+The Spec.hs file referred to above looks like this:
+
+```haskell
+
+module Main
+    ( main
+    ) where
+
+import qualified Spec.Model
+import qualified Spec.Trace
+import           Test.Tasty
+
+main :: IO ()
+main = defaultMain tests
+
+tests :: TestTree
+tests = testGroup "token sale"
+    [ Spec.Trace.tests
+    , Spec.Model.tests
+    ]
+```
+
+It is worth noting that while property-based testing is powerful, there still remain limitations including:
+
+- Only being able to test contracts that are provided and not all possible off-chain code, including that which might attempt to exploit untested vulnerabilities
+
+- Not testing cases involving concurrency without a very complex setup
