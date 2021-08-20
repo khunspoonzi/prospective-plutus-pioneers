@@ -8,6 +8,17 @@ The objective of such a language is to provide a specialized context that is mor
 - Clearer error messages
 - More guarantees on program behavior
 
+The so-called "Marlowe Suite" is comprised of several components:
+
+| Component          | Description                                           |
+| ------------------ | ----------------------------------------------------- |
+| marlowe-finance.io | Website                                               |
+| Run                | End users obtain and run contracts distributed        |
+| Market             | Contracts are uploaded and downloaded with assurances |
+| Play               | Contracts can be simulated interactively              |
+| Build              | Contracts built in code, visually, embedded           |
+
+
 In this section, we'll take a closer look at why DSLs like Marlowe are important when writing financial contracts.
 
 ## [What Does a Financial Contract Do?](https://youtu.be/H1WPL01qWCc?t=296)
@@ -72,16 +83,31 @@ The constructors in `Contract` can be summarized as follows:
 
 - `When`: A specific `Contract` is invoked upon its corresponding `Action` unless a `Timeout` occurs, at which point a different `Contract` will be invoked.
 
-## [The Marlowe Suite](https://youtu.be/H1WPL01qWCc?t=918)
+### [Executing a Marlow Contract](https://youtu.be/H1WPL01qWCc?t=1392)
 
-The so-called "Marlowe Suite" is comprised of several components:
+To execute a Marlowe contract, Marlowe Run is used to build and sign a series of transactions off chain, which are then validated on the blockchain through the Marlowe interpreter, i.e. a Plutus contract using the (E)UTxO model.
 
-| Component          | Description                                           |
-| ------------------ | ----------------------------------------------------- |
-| marlowe-finance.io | Website                                               |
-| Run                | End users obtain and run contracts distributed        |
-| Market             | Contracts are uploaded and downloaded with assurances |
-| Play               | Contracts can be simulated interactively              |
-| Build              | Contracts built in code, visually, embedded           |
+### [Usability](https://youtu.be/H1WPL01qWCc?t=1944)
 
-### More Notes Soon...
+Marlowe provides various ways of authoring contracts, including by:
+
+- Writing pure Marlowe
+- Using a no-code visual editor
+- Using an embedded DSL in Haskel or JavaScript editors, compiled into pure Marlowe
+- Generating contracts based on initial conditions in functions that produce Marlowe code
+
+Marlowe contracts can also be explored before they are run in a simulation using the Marlowe Playground, which combines Marlowe Play and Marlowe Build into a single interface that allows you to interactively step foward and backward through the source code.
+
+### [Assurance](https://youtu.be/H1WPL01qWCc?t=2220)
+
+Marlowe provides assurances by using the power of logic, specifically through static analysis and verification.
+
+Static analysis allows us to check all execution paths through a Marlowe contract, including all choices and all choices of slots for a transaction submission. For instance, static analysis can be used to automatically check if a constructor could fail (such as `Pay`), and if so, provide an example of a path that leads to that failure.
+
+
+Meanwhile verification allows us to demonstrate that the system is safe by proving its properties by hand, e.g.:
+
+- Accounts never have a negative balance
+- Money preservation, i.e. `money_in = money_in_accounts + money_out`
+- Closes produce no warnings
+- Static analysis is sound and complete
